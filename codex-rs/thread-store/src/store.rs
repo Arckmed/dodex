@@ -209,6 +209,20 @@ pub trait ThreadStore: Any + Send + Sync {
     /// replay history and before updating any implementation-owned projections.
     fn append_items(&self, params: AppendThreadItemsParams) -> ThreadStoreFuture<'_, ()>;
 
+    /// Load the latest local Commentary checkpoint without exposing it as model context.
+    /// Return even an unsupported or malformed checkpoint so the caller can report it without
+    /// overwriting newer state with an older checkpoint.
+    /// Stores with paginated history must override this to follow their bounded lineage.
+    fn load_commentary_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
+        Box::pin(async move {
+            let history = self.load_history(params).await?;
+            Ok(history.items.into_iter().rev().find_map(|item| match item {
+                RolloutItem::EventMsg(codex_protocol::protocol::EventMsg::DodexCommentaryState(event)) => Some(event.state),
+                _ => None,
+            }))
+        })
+    }
+
     /// Records metadata derived from rollout items.
     /// Unlike [`Self::update_thread_metadata`], this allows the write to be deferred.
     ///

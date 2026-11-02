@@ -5,6 +5,7 @@ mod daemon_continuation;
 mod daemon_snapshot;
 
 mod workspace_switching;
+mod dodex_commentary;
 
 use super::persisted_resume_settings::PersistedResumeSettings;
 use super::persisted_resume_settings::latest_owned_thread_settings;

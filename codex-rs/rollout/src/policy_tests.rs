@@ -10,6 +10,17 @@ use codex_protocol::protocol::ThreadHistoryMode;
 
 use super::persisted_event_msg;
 
+#[test]
+fn commentary_checkpoint_is_persisted_in_both_history_modes() {
+    let state = serde_json::json!({ "version": 1, "enabled": true, "comments": [] });
+    let event = EventMsg::DodexCommentaryState(codex_protocol::protocol::DodexCommentaryStateEvent { state: state.clone() });
+    for mode in [ThreadHistoryMode::Legacy, ThreadHistoryMode::Paginated] {
+        let persisted = persisted_event_msg(&event, mode).expect("checkpoint must be saved");
+        let EventMsg::DodexCommentaryState(saved) = persisted.as_ref() else { panic!("expected Commentary checkpoint"); };
+        assert_eq!(saved.state, state);
+    }
+}
+
 fn image_item(image: GeneratedImageRef) -> ImageGenerationItem {
     ImageGenerationItem {
         id: "image-1".to_string(),

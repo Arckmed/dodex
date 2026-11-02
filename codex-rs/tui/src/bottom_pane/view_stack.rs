@@ -15,6 +15,9 @@ use ratatui::widgets::Widget;
 pub(super) struct ViewStack<'a>(pub(super) &'a [Box<dyn BottomPaneView>]);
 
 fn dialog_area(view: &dyn BottomPaneView, area: Rect) -> Rect {
+    if area.height != u16::MAX && let Some(dialog) = view.centered_area(area) {
+        return dialog.intersection(area);
+    }
     let width = area
         .width
         .saturating_sub(/*rhs*/ 4)

@@ -1757,6 +1757,89 @@ impl AppServerSession {
             .wrap_err("thread/goal/get failed in TUI")
     }
 
+    pub(crate) async fn thread_commentary_get(&mut self, thread_id: ThreadId) -> Result<Option<serde_json::Value>> {
+        let request_id = self.next_request_id();
+        let response: codex_app_server_protocol::ThreadCommentaryGetResponse = self.request_handle.request_typed(ClientRequest::ThreadCommentaryGet {
+            request_id, params: codex_app_server_protocol::ThreadCommentaryGetParams { thread_id: thread_id.to_string() },
+        }).await.wrap_err("thread/dodex/commentary/get failed in TUI")?;
+        Ok(response.state)
+    }
+
+    /// Confirm only an exact, persisted plain user message, scanning every history page.
+    pub(crate) async fn thread_commentary_sources(&mut self, thread_id: ThreadId) -> Result<Vec<(String, codex_app_server_protocol::ThreadItem)>> {
+        if self.thread_read(thread_id, false).await?.history_mode == ThreadHistoryMode::Legacy {
+            return Ok(self.thread_read(thread_id, true).await?.turns.into_iter().rev().flat_map(|turn| {
+                let turn_id = turn.id;
+                turn.items.into_iter().rev().filter(|item| matches!(&item.payload, codex_app_server_protocol::ThreadItemPayload::AgentMessage { .. })).map(move |item| (turn_id.clone(), item))
+            }).collect());
+        }
+        let mut sources = Vec::new(); let mut cursor = None; let mut seen = std::collections::HashSet::new();
+        loop {
+            let request_id = self.next_request_id();
+            let page: codex_app_server_protocol::ThreadItemsListResponse = self.request_handle.request_typed(ClientRequest::ThreadItemsList {
+                request_id, params: thread_items_page_params(thread_id, None, cursor, 100),
+            }).await.wrap_err("failed to list Commentary assistant sources")?;
+            for entry in page.data {
+                if matches!(&entry.item.payload, codex_app_server_protocol::ThreadItemPayload::AgentMessage { .. }) {
+                    let turn_id = entry.turn_id.clone(); sources.push((turn_id, entry.into()));
+                }
+            }
+            let Some(next) = page.next_cursor else { return Ok(sources); };
+            if !seen.insert(next.clone()) { color_eyre::eyre::bail!("history cursor repeated while listing Commentary sources"); }
+            cursor = Some(next);
+        }
+    }
+
+    /// Confirm only an exact, persisted plain user message, scanning every history page.
+    pub(crate) async fn thread_commentary_received(&mut self, thread_id: ThreadId, expected: &str) -> Result<bool> {
+        let matches = |payload: &codex_app_server_protocol::ThreadItemPayload| {
+            if let codex_app_server_protocol::ThreadItemPayload::UserMessage { content, .. } = payload {
+                matches!(content.as_slice(), [codex_app_server_protocol::UserInput::Text { text, .. }] if text == expected)
+            } else { false }
+        };
+        if self.thread_read(thread_id, false).await?.history_mode == ThreadHistoryMode::Legacy {
+            return Ok(self.thread_read(thread_id, true).await?.turns.iter().flat_map(|turn| &turn.items).any(|item| matches(&item.payload)));
+        }
+        let mut cursor = None;
+        let mut seen = std::collections::HashSet::new();
+        loop {
+            let request_id = self.next_request_id();
+            let page: codex_app_server_protocol::ThreadItemsListResponse = self.request_handle.request_typed(ClientRequest::ThreadItemsList {
+                request_id, params: thread_items_page_params(thread_id, None, cursor, 100),
+            }).await.wrap_err("failed to check the persisted Commentary receipt")?;
+            if page.data.iter().any(|entry| matches(&entry.item.payload)) { return Ok(true); }
+            let Some(next) = page.next_cursor else { return Ok(false); };
+            if !seen.insert(next.clone()) { color_eyre::eyre::bail!("history cursor repeated while checking Commentary receipt"); }
+            cursor = Some(next);
+        }
+    }
+
+    pub(crate) async fn thread_commentary_set(&mut self, thread_id: ThreadId, state: serde_json::Value) -> Result<()> {
+        let request_id = self.next_request_id();
+        let _: codex_app_server_protocol::ThreadCommentarySetResponse = self.request_handle.request_typed(ClientRequest::ThreadCommentarySet {
+            request_id, params: codex_app_server_protocol::ThreadCommentarySetParams { thread_id: thread_id.to_string(), state },
+        }).await.wrap_err("thread/dodex/commentary/set failed in TUI")?;
+        Ok(())
+    }
+
+    /// Resolve a saved assistant source by both turn and item identity, never by quotation text.
+    pub(crate) async fn thread_commentary_source(&mut self, thread_id: ThreadId, turn_id: &str, item_id: &str) -> Result<Option<codex_app_server_protocol::ThreadItem>> {
+        let mode = self.thread_read(thread_id, /*include_turns*/ false).await?.history_mode;
+        let item = if mode == ThreadHistoryMode::Legacy {
+            self.thread_read(thread_id, /*include_turns*/ true).await?.turns.into_iter()
+                .find(|turn| turn.id == turn_id)
+                .and_then(|turn| turn.items.into_iter().find(|item| item.id() == item_id))
+        } else {
+            let request_id = self.next_request_id();
+            let response: codex_app_server_protocol::ThreadItemsReadResponse = self.request_handle.request_typed(ClientRequest::ThreadItemsRead {
+                request_id,
+                params: codex_app_server_protocol::ThreadItemsReadParams { thread_id: thread_id.to_string(), turn_id: turn_id.to_owned(), item_ids: vec![item_id.to_owned()] },
+            }).await.wrap_err("thread/items/read failed while resolving a Commentary source")?;
+            response.data.into_iter().find(|entry| entry.turn_id == turn_id && entry.item.id() == item_id).map(Into::into)
+        };
+        Ok(item.filter(|item: &codex_app_server_protocol::ThreadItem| matches!(&item.payload, codex_app_server_protocol::ThreadItemPayload::AgentMessage { .. })))
+    }
+
     pub(crate) async fn thread_goal_set(
         &mut self,
         thread_id: ThreadId,

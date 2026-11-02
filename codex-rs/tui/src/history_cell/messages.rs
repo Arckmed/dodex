@@ -571,6 +571,8 @@ impl HistoryCell for AgentMessageCell {
 pub(crate) struct AgentMarkdownCell {
     markdown_source: String,
     copy_source: Option<String>,
+    source_item_id: Option<String>,
+    source_turn_id: Option<String>,
     cwd: PathBuf,
     inline_visualization_context: Option<crate::inline_visualization::InlineVisualizationContext>,
     rendered_lines: Option<MarkdownRenderCache>,
@@ -579,6 +581,24 @@ pub(crate) struct AgentMarkdownCell {
 }
 
 impl AgentMarkdownCell {
+    pub(crate) fn with_source_turn_id(mut self, id: Option<String>) -> Self {
+        self.source_turn_id = id;
+        self
+    }
+
+    pub(crate) fn source_turn_id(&self) -> Option<&str> {
+        self.source_turn_id.as_deref()
+    }
+
+    pub(crate) fn with_source_item_id(mut self, id: Option<String>) -> Self {
+        self.source_item_id = id;
+        self
+    }
+
+    pub(crate) fn source_item_id(&self) -> Option<&str> {
+        self.source_item_id.as_deref()
+    }
+
     pub(crate) fn with_copy_source(mut self, source: Option<String>) -> Self {
         self.copy_source = source;
         self
@@ -611,6 +631,8 @@ impl AgentMarkdownCell {
         Self {
             markdown_source,
             copy_source: None,
+            source_item_id: None,
+            source_turn_id: None,
             cwd: cwd.to_path_buf(),
             inline_visualization_context,
             rendered_lines,

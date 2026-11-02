@@ -1036,6 +1036,11 @@ impl CodexThread {
         live_thread.load_history(include_archived).await
     }
 
+    pub async fn load_commentary_state(&self) -> ThreadStoreResult<Option<serde_json::Value>> {
+        let live_thread = self.session.live_thread_for_persistence("load Commentary state").map_err(|err| ThreadStoreError::Internal { message: err.to_string() })?;
+        live_thread.load_commentary_state().await
+    }
+
     pub async fn read_thread(
         &self,
         include_archived: bool,

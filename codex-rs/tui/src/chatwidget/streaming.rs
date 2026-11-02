@@ -88,6 +88,13 @@ impl ChatWidget {
     }
 
     fn flush_answer_stream(&mut self, completed_message: Option<&str>) {
+        let source_identity = if completed_message.is_some() {
+            self.transcript.last_completed_agent_message.as_ref()
+        } else if self.transcript.mixed_streamed_agent_messages {
+            None
+        } else {
+            self.transcript.active_streamed_agent_message.as_ref()
+        }.cloned();
         let had_stream_controller = self.stream_controller.is_some();
         if let Some(mut controller) = self.stream_controller.take() {
             let needs_scrollback_reflow = controller.needs_scrollback_reflow();
@@ -146,6 +153,8 @@ impl ChatWidget {
                 self.app_event_tx.send(AppEvent::ConsolidateAgentMessage {
                     source,
                     copy_source,
+                    source_item_id: source_identity.as_ref().map(|(_, id)| id.clone()),
+                    source_turn_id: source_identity.map(|(turn, _)| turn),
                     cwd: self.config.cwd.to_path_buf(),
                     inline_visualization_context,
                     scrollback_reflow,
@@ -164,6 +173,7 @@ impl ChatWidget {
             self.transcript.active_streamed_agent_message = None;
             self.transcript.last_flushed_agent_message = None;
         }
+        if had_stream_controller { self.transcript.mixed_streamed_agent_messages = false; }
     }
 
     pub(super) fn stream_controllers_idle(&self) -> bool {
@@ -477,6 +487,8 @@ impl ChatWidget {
                     context,
                 )
                 .with_questions(questions)
+                .with_source_item_id(Some(item.id.clone()))
+                .with_source_turn_id(Some(turn_id.to_owned()))
                 .with_copy_source(Some(message.clone())),
             );
             self.handle_stream_finished();

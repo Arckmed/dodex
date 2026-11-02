@@ -155,13 +155,15 @@ impl App {
     }
 
     fn sync_owned_transcript(&mut self, width: u16) -> bool {
+        let commentary_enabled = self.commentary_enabled();
+        self.transcript_view.set_commentary_passages(self.commentary_passages());
         self.transcript_view.image_protocol = self.prepare_frame_images();
         let chat_widget = &self.chat_widget;
         let transcript_width = chat_widget.history_wrap_width(width);
         let view = &mut self.transcript_view;
         view.mouse_scroll_speed = self.local_settings.tui.mouse_scroll_speed.unwrap_or(1.0);
         view.primary_selection = self.right_click_paste_environment.primary;
-        view.copy_on_select = self
+        view.copy_on_select = !commentary_enabled && self
             .local_settings
             .copy_on_select(&codex_terminal_detection::terminal_info());
         view.copy_on_select_clear_selection =
@@ -548,6 +550,24 @@ impl App {
         event: &TuiEvent,
     ) -> Result<bool> {
         let has_modal = self.chat_widget.has_active_modal();
+        if tui.is_owned_screen() && !has_modal && self.overlay.is_none()
+            && matches!(event, TuiEvent::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('m') && key.modifiers == KeyModifiers::ALT)
+        {
+            self.app_event_tx.send(AppEvent::CommentaryCommand { argument: String::new() });
+            return Ok(true);
+        }
+        if tui.is_owned_screen() && !has_modal && self.overlay.is_none()
+            && matches!(event, TuiEvent::Key(key) if key.kind == KeyEventKind::Press && matches!(key.code, KeyCode::Char('C') | KeyCode::Char('c')) && key.modifiers.contains(KeyModifiers::ALT) && (key.modifiers.contains(KeyModifiers::SHIFT) || key.code == KeyCode::Char('C')))
+        {
+            self.app_event_tx.send(AppEvent::OpenCommentaryOutbox);
+            return Ok(true);
+        }
+        if tui.is_owned_screen() && !has_modal && self.overlay.is_none()
+            && matches!(event, TuiEvent::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::ALT)
+        {
+            self.app_event_tx.send(AppEvent::OpenCommentarySelection);
+            return Ok(true);
+        }
         let modal_transcript_mouse = has_modal
             && matches!(event, TuiEvent::Mouse(mouse)
                 if self.chat_widget.centered_dialog().is_none()
@@ -601,6 +621,10 @@ impl App {
             return Ok(false);
         }
         if let TuiEvent::Mouse(mouse) = event {
+            if self.chat_widget.handle_view_mouse(*mouse) {
+                tui.frame_requester().schedule_frame();
+                return Ok(true);
+            }
             let composer_ready = self.chat_widget.prepare_composer_mouse(*mouse);
             if mouse.kind != crossterm::event::MouseEventKind::Moved {
                 self.refresh_owned_transcript(tui)?;
@@ -862,6 +886,14 @@ impl App {
             return self.handle_owned_backtrack_event(tui, event);
         };
         let resume_following = matches!(action, ViewAction::CopyAndFollow(_));
+        if self.commentary_enabled() && !has_modal
+            && matches!(event, TuiEvent::Mouse(mouse) if mouse.kind == crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left))
+            && self.transcript_view.selected_assistant().is_ok()
+        {
+            self.app_event_tx.send(AppEvent::OpenCommentarySelection);
+            tui.frame_requester().schedule_frame();
+            return Ok(true);
+        }
         if !matches!(action, ViewAction::ExitSelectMode) {
             if let Some((characters, result)) = self.transcript_view.copy_action(
                 tui,

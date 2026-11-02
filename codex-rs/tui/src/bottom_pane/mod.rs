@@ -752,6 +752,14 @@ impl BottomPane {
         self.view_stack.last().map(std::convert::AsRef::as_ref)
     }
 
+    pub(crate) fn handle_view_mouse(&mut self, event: crossterm::event::MouseEvent) -> bool {
+        let handled = self.view_stack.last_mut().is_some_and(|view| view.handle_mouse_event(event));
+        if handled {
+            self.request_redraw();
+        }
+        handled
+    }
+
     pub(crate) fn current_patch_approval(&self) -> Option<&ApplyPatchApprovalRequest> {
         self.view_stack
             .iter()

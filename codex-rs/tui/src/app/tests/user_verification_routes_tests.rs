@@ -274,6 +274,8 @@ async fn inactive_thread_user_verification_preserves_foreground_stream() -> Resu
                 copy_source,
                 cwd,
                 inline_visualization_context,
+                source_item_id,
+                source_turn_id,
                 scrollback_reflow,
                 deferred_history_cell,
             } => {
@@ -285,7 +287,9 @@ async fn inactive_thread_user_verification_preserves_foreground_stream() -> Resu
                         &cwd,
                         inline_visualization_context,
                     )
-                    .with_copy_source(copy_source),
+                    .with_copy_source(copy_source)
+                    .with_source_item_id(source_item_id)
+                    .with_source_turn_id(source_turn_id),
                     scrollback_reflow,
                     deferred_history_cell,
                 )?;

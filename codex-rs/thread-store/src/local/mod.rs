@@ -1,5 +1,6 @@
 mod archive_thread;
 mod create_thread;
+mod commentary;
 mod delete_thread;
 mod helpers;
 mod history_revision;
@@ -614,6 +615,10 @@ impl ThreadStore for LocalThreadStore {
         params: LoadThreadHistoryParams,
     ) -> ThreadStoreFuture<'_, StoredModelContext> {
         Box::pin(async move { model_context::load_latest_model_context(self, params).await })
+    }
+
+    fn load_commentary_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
+        Box::pin(async move { commentary::load(self, params).await })
     }
 
     fn is_model_context_current(

@@ -15,6 +15,29 @@ use codex_protocol::permissions::NetworkSandboxPolicy;
 use pretty_assertions::assert_eq;
 
 #[tokio::test]
+async fn replayed_assistant_message_retains_source_item_identity() {
+    let (mut chat, mut rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    while rx.try_recv().is_ok() {}
+    chat.replay_thread_item(
+        AppServerThreadItemPayload::AgentMessage {
+            id: "replayed-item".into(),
+            text: "A replayed response".into(),
+            phase: Some(MessagePhase::FinalAnswer),
+            memory_citation: None,
+            delivery: None,
+            questions: None,
+        },
+        "turn-1".into(),
+        ReplayKind::ThreadSnapshot,
+    );
+    let ids = std::iter::from_fn(|| rx.try_recv().ok()).filter_map(|event| match event {
+        AppEvent::InsertHistoryCell(cell) => cell.as_any().downcast_ref::<crate::history_cell::AgentMarkdownCell>().and_then(|cell| Some((cell.source_item_id()?.to_owned(), cell.source_turn_id()?.to_owned()))),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(ids, [("replayed-item".to_owned(), "turn-1".to_owned())]);
+}
+
+#[tokio::test]
 async fn resumed_initial_messages_render_history() {
     let (mut chat, mut rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
     chat.set_feature_enabled(Feature::CliDaybreak, /*enabled*/ false);

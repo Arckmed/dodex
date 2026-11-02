@@ -32,6 +32,25 @@ use test_case::test_case;
 use uuid::Uuid;
 
 #[tokio::test]
+async fn commentary_checkpoint_is_not_replayed_into_model_history() {
+    let (session, mut turn) = make_session_and_context().await;
+    let secret = "unsent-private-commentary-observation";
+    let items = vec![
+        RolloutItem::ResponseItem(user_message("visible user message").into()),
+        RolloutItem::EventMsg(EventMsg::DodexCommentaryState(codex_protocol::protocol::DodexCommentaryStateEvent {
+            state: json!({ "version": 1, "enabled": true, "comments": [{ "note": secret }] }),
+        })),
+    ];
+    for mode in [ThreadHistoryMode::Legacy, ThreadHistoryMode::Paginated] {
+        turn.history_mode = mode;
+        let reconstructed = session.reconstruct_history_from_rollout(&turn, &items).await;
+        let model_input = serde_json::to_string(&reconstructed.history).unwrap();
+        assert!(model_input.contains("visible user message"));
+        assert!(!model_input.contains(secret));
+    }
+}
+
+#[tokio::test]
 async fn recorded_questions_share_queued_input_order_across_resume() {
     let (session, turn) = make_session_and_context().await;
     let question = |call_id: &str| {

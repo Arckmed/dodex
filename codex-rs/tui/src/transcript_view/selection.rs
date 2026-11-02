@@ -22,6 +22,25 @@ struct PendingCopy {
     characters: usize,
 }
 
+/// A selected range in a finalized assistant cell's displayed revision.
+/// The cell reference is an in-memory identity, not a persisted thread item ID.
+pub(crate) struct AssistantSelection {
+    pub(crate) cell: Arc<dyn HistoryCell>,
+    pub(crate) source_item_id: String,
+    pub(crate) source_turn_id: String,
+    pub(crate) display_range: std::ops::Range<usize>,
+    pub(crate) display_row: usize,
+    pub(crate) quotation: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AssistantSelectionError {
+    NoSelection,
+    NotSingleAssistantMessage,
+    SourceUnavailable,
+    TooLarge,
+}
+
 pub(super) struct Selection {
     pending_copy: Option<PendingCopy>,
     primary_owner: Option<Arc<()>>,
@@ -325,6 +344,34 @@ impl TranscriptView {
         }
         text.retain(|ch| !ch.is_control() || matches!(ch, '\n' | '\t'));
         Some(text)
+    }
+
+    /// Capture an exact single-message selection without guessing from its text. This is based
+    /// on the pinned display revision, so repeated quotations and reflow retain their offsets.
+    /// A live, non-assistant, empty, or cross-cell selection cannot identify a finished message.
+    pub(crate) fn selected_assistant(&mut self) -> Result<AssistantSelection, AssistantSelectionError> {
+        use AssistantSelectionError as Error;
+        let selection = self.selection.as_ref().ok_or(Error::NoSelection)?;
+        if selection.start.key != selection.end.key || selection.start.key == EntryKey::Live {
+            return Err(Error::NotSingleAssistantMessage);
+        }
+        let cells = Arc::clone(&selection.snapshot.cells);
+        let index = self.resolve(&cells, selection.start);
+        let cell = Arc::clone(cells.get(index).ok_or(Error::SourceUnavailable)?);
+        if EntryKey::cell(&cell) != selection.start.key { return Err(Error::SourceUnavailable); }
+        let assistant = cell.as_any().downcast_ref::<crate::history_cell::AgentMarkdownCell>().ok_or(Error::NotSingleAssistantMessage)?;
+        let source_item_id = assistant.source_item_id().ok_or(Error::SourceUnavailable)?.to_owned();
+        let source_turn_id = assistant.source_turn_id().ok_or(Error::SourceUnavailable)?.to_owned();
+        let start = selection.start.offset.min(selection.end.offset);
+        let end = selection.start.offset.max(selection.end.offset);
+        let layout = self.layout(&cells, index).ok_or(Error::SourceUnavailable)?;
+        let mut quotation = layout.text().get(start..end).ok_or(Error::SourceUnavailable)?.to_owned();
+        quotation.retain(|ch| !ch.is_control() || matches!(ch, '\n' | '\t'));
+        // Pi bounds selected passages at 50,000 UTF-16 code units, including non-BMP text.
+        if quotation.trim().is_empty() { return Err(Error::NoSelection); }
+        if quotation.encode_utf16().count() > 50_000 { return Err(Error::TooLarge); }
+        let display_row = layout.row_for_offset(start);
+        Ok(AssistantSelection { cell, source_item_id, source_turn_id, display_range: start..end, display_row, quotation })
     }
 
     /// A PRIMARY write is silent: it neither claims CLIPBOARD was copied nor ends selection.

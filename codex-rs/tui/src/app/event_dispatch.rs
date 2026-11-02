@@ -60,6 +60,9 @@ impl App {
             && !matches!(
                 &event,
                 AppEvent::OpenDaemonMenu
+                    | AppEvent::CommentaryEditor { .. }
+                    | AppEvent::CommentaryReview { .. }
+                    | AppEvent::SaveCommentaryCheckpoint { .. }
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -169,7 +172,35 @@ impl App {
             }
             event => (event, None),
         };
+        if matches!(&event, AppEvent::ForkCurrentSession { .. } | AppEvent::StartManagedWorktree { mode: crate::app_event::ManagedWorktreeMode::Fork, .. })
+            && !self.flush_current_commentary_checkpoint(app_server).await
+        {
+            self.chat_widget.add_error_message("Could not save pending Commentary before forking. The fork was not created.".into());
+            return Ok(AppRunControl::Continue);
+        }
+        if matches!(&event, AppEvent::Exit(_) | AppEvent::ConfirmedEmbeddedExit(_)) {
+            self.flush_commentary_checkpoints(app_server).await;
+        }
+        if matches!(&event, AppEvent::CommentaryLoaded { .. } | AppEvent::CheckCommentaryReceipt { .. } | AppEvent::CommentaryCommand { .. }) {
+            tui.frame_requester().schedule_frame();
+        }
         match event {
+            AppEvent::OpenCommentarySelection => self.open_commentary_selection(app_server).await,
+            AppEvent::ResumeCommentaryDraft { thread_id } => self.edit_commentary_draft(app_server, thread_id).await,
+            AppEvent::CommentaryCommand { argument } => self.handle_commentary_command(app_server, &argument).await,
+            AppEvent::CommentaryLoaded { thread_id, load_id, result } => self.commentary_loaded(app_server, thread_id, load_id, result).await,
+            AppEvent::OpenCommentaryOutbox => self.open_commentary_outbox(app_server).await,
+            AppEvent::OpenCommentarySource { thread_id, source } => self.show_commentary_source(app_server, thread_id, source).await,
+            AppEvent::OpenCommentaryReview { thread_id, retry_confirmed } => self.open_commentary_review(app_server, thread_id, retry_confirmed).await,
+            AppEvent::CommentaryReview { thread_id, review_id, event } => self.handle_commentary_review(app_server, thread_id, review_id, event).await,
+            AppEvent::CheckCommentaryReceipt { thread_id, attempt } => self.check_commentary_receipt(app_server, thread_id, attempt).await,
+            AppEvent::ResetCommentarySubmission { thread_id, expected_id, action, draft } => self.reset_commentary_submission(app_server, thread_id, &expected_id, action, draft).await,
+            AppEvent::BeginCommentaryDraft { thread_id, draft, replace } => self.begin_commentary_draft(app_server, thread_id, draft, replace).await,
+            AppEvent::CommentaryReader { thread_id, event } => self.handle_commentary_reader(app_server, thread_id, event).await,
+            AppEvent::CommentaryOutboxAction { thread_id, action } => self.handle_commentary_outbox(app_server, thread_id, action).await,
+            AppEvent::ConfirmCommentaryRemoval { thread_id, comment_id } => self.remove_commentary_annotation(app_server, thread_id, comment_id).await,
+            AppEvent::CommentaryEditor { thread_id, editor_id, event } => self.handle_commentary_editor(app_server, thread_id, editor_id, event).await,
+            AppEvent::SaveCommentaryCheckpoint { thread_id, revision } => self.save_commentary_checkpoint(app_server, thread_id, revision).await,
             AppEvent::OpenDaemonMenu => self.open_daemon_menu(),
             AppEvent::ConfirmDaemonRestart => self.confirm_daemon_restart(),
             AppEvent::RunDaemonRestart => {
@@ -969,6 +1000,8 @@ impl App {
             AppEvent::ConsolidateAgentMessage {
                 source,
                 copy_source,
+                source_item_id,
+                source_turn_id,
                 cwd,
                 inline_visualization_context,
                 scrollback_reflow,
@@ -976,7 +1009,7 @@ impl App {
             } => {
                 self.handle_consolidate_agent_message(
                     tui,
-                    history_cell::AgentMarkdownCell::new_with_inline_visualizations(source, &cwd, inline_visualization_context).with_copy_source(copy_source),
+                    history_cell::AgentMarkdownCell::new_with_inline_visualizations(source, &cwd, inline_visualization_context).with_copy_source(copy_source).with_source_item_id(source_item_id).with_source_turn_id(source_turn_id),
                     scrollback_reflow,
                     deferred_history_cell,
                 )?;

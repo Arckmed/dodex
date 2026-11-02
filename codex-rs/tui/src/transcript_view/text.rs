@@ -474,6 +474,14 @@ impl TextLayout {
         buf: &mut Buffer,
         start_row: usize,
     ) {
+        self.style_range(range, area, buf, start_row, Style::default().add_modifier(Modifier::REVERSED));
+    }
+
+    pub(super) fn background(&self, range: Range<usize>, area: Rect, buf: &mut Buffer, start_row: usize, color: ratatui::style::Color) {
+        self.style_range(range, area, buf, start_row, Style::default().bg(color));
+    }
+
+    fn style_range(&self, range: Range<usize>, area: Rect, buf: &mut Buffer, start_row: usize, style: Style) {
         for (screen_row, row) in self.visible_rows(area, start_row) {
             let mut column = row.first_column;
             for (offset, grapheme) in
@@ -486,7 +494,7 @@ impl TextLayout {
                         column..(column + width).min(usize::from(row.content_width))
                     {
                         buf[(area.x + selected_column as u16, area.y + screen_row)]
-                            .set_style(Style::default().add_modifier(Modifier::REVERSED));
+                            .set_style(style);
                     }
                 }
                 column += width;

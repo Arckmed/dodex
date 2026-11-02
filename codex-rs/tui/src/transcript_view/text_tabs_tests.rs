@@ -12,6 +12,26 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 
 #[test]
+fn passage_background_preserves_foreground_and_newer_overlap_wins() {
+    let layout = TextLayout::new(vec![HyperlinkLine::new(Line::from("a界b".green().bold()))], 10);
+    let area = Rect::new(0, 0, 10, 1);
+    let mut buffer = Buffer::empty(area);
+    layout.render(area, &mut buffer, 0);
+    let before = buffer.clone();
+    layout.background(0..5, area, &mut buffer, 0, Color::Blue);
+    layout.background(1..4, area, &mut buffer, 0, Color::Red);
+    for col in 0..4 {
+        assert_eq!(buffer[(col, 0)].fg, before[(col, 0)].fg);
+        assert_eq!(buffer[(col, 0)].modifier, before[(col, 0)].modifier);
+    }
+    assert_eq!(buffer[(0, 0)].bg, Color::Blue);
+    assert_eq!(buffer[(1, 0)].bg, Color::Red);
+    assert_eq!(buffer[(2, 0)].bg, Color::Red);
+    assert_eq!(buffer[(3, 0)].bg, Color::Blue);
+    assert_eq!(buffer[(4, 0)].bg, before[(4, 0)].bg);
+}
+
+#[test]
 fn styled_tabs_use_row_stops_including_the_gutter() {
     let mut line = HyperlinkLine::new(Line::from("\ttabs:\t".green()));
     line.push_span("one".cyan(), Some("https://example.com/one"));

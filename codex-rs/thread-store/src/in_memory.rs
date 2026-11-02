@@ -923,6 +923,17 @@ impl ThreadStore for InMemoryThreadStore {
         self
     }
 
+    fn load_commentary_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
+        Box::pin(async move {
+            let state = self.state.lock().await;
+            let items = state.histories.get(&params.thread_id).ok_or(ThreadStoreError::ThreadNotFound { thread_id: params.thread_id })?;
+            Ok(items.iter().rev().find_map(|item| match item {
+                RolloutItem::EventMsg(codex_protocol::protocol::EventMsg::DodexCommentaryState(event)) => Some(event.state.clone()),
+                _ => None,
+            }))
+        })
+    }
+
     fn create_thread(&self, params: CreateThreadParams) -> ThreadStoreFuture<'_, ()> {
         Box::pin(InMemoryThreadStore::create_thread(self, params))
     }

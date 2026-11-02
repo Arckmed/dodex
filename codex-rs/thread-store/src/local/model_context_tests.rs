@@ -34,6 +34,65 @@ use crate::local::test_support::test_config;
 use crate::local::test_support::write_session_file_with_history_mode;
 
 #[tokio::test]
+async fn commentary_checkpoint_follows_frozen_fork_and_exposes_invalid_newer_state() {
+    use codex_protocol::protocol::DodexCommentaryStateEvent;
+    let home = TempDir::new().expect("temp dir");
+    let root_uuid = Uuid::from_u128(3901);
+    let root_id = ThreadId::from_string(&root_uuid.to_string()).unwrap();
+    let child_uuid = Uuid::from_u128(3902);
+    let child_id = ThreadId::from_string(&child_uuid.to_string()).unwrap();
+    let checkpoint = |state| RolloutItem::EventMsg(EventMsg::DodexCommentaryState(DodexCommentaryStateEvent { state }));
+    let inherited = serde_json::json!({ "version": 1, "enabled": true, "comments": [{"id": "inherited"}] });
+    let later = serde_json::json!({ "version": 1, "enabled": true, "comments": [{"id": "later"}] });
+    let root_path = write_ordinaled_paginated_rollout(home.path(), "2025-01-03T13-05-01", root_uuid, [checkpoint(inherited.clone()), checkpoint(later)]);
+    let child_path = write_ordinaled_paginated_rollout(home.path(), "2025-01-03T13-05-02", child_uuid, []);
+    set_history_base(&child_path, history_position(&root_path, root_id, 2));
+    let store = LocalThreadStore::new(test_config(home.path()), /*state_db*/ None);
+    let params = LoadThreadHistoryParams { thread_id: child_id, include_archived: false };
+    assert_eq!(store.load_commentary_state(params.clone()).await.unwrap(), Some(inherited));
+
+    let child = serde_json::json!({ "version": 1, "enabled": false, "comments": [{"id": "child"}] });
+    let mut file = OpenOptions::new().append(true).open(&child_path).unwrap();
+    for (ordinal, state) in [(3, child.clone()), (4, serde_json::json!({ "version": 999 }))] {
+        let line = RolloutLine { timestamp: "2025-01-03T13:05:02Z".into(), ordinal: Some(ordinal), item: checkpoint(state) };
+        writeln!(file, "{}", serde_json::to_string(&line).unwrap()).unwrap();
+    }
+    drop(file);
+    assert_eq!(store.load_commentary_state(params).await.unwrap(), Some(serde_json::json!({ "version": 999 })));
+}
+
+#[tokio::test]
+async fn commentary_checkpoint_survives_model_context_compaction() {
+    use codex_protocol::protocol::DodexCommentaryStateEvent;
+    let home = TempDir::new().expect("temp dir");
+    let uuid = Uuid::from_u128(3903);
+    let thread_id = ThreadId::from_string(&uuid.to_string()).unwrap();
+    let saved = serde_json::json!({ "version": 1, "enabled": false, "comments": [], "draft": { "note": "unfinished" } });
+    write_ordinaled_paginated_rollout(home.path(), "2025-01-03T13-05-03", uuid, [
+        RolloutItem::EventMsg(EventMsg::DodexCommentaryState(DodexCommentaryStateEvent { state: saved.clone() })),
+        compacted("new context window", Some(Vec::new())),
+    ]);
+    let store = LocalThreadStore::new(test_config(home.path()), /*state_db*/ None);
+    assert_eq!(store.load_commentary_state(LoadThreadHistoryParams { thread_id, include_archived: false }).await.unwrap(), Some(saved));
+}
+
+#[tokio::test]
+async fn commentary_checkpoint_survives_legacy_model_context_compaction() {
+    use codex_protocol::protocol::DodexCommentaryStateEvent;
+    let home = TempDir::new().expect("temp dir");
+    let uuid = Uuid::from_u128(3904);
+    let thread_id = ThreadId::from_string(&uuid.to_string()).unwrap();
+    let saved = serde_json::json!({ "version": 1, "enabled": true, "comments": [], "draft": { "note": "legacy draft" } });
+    let path = write_session_file_with_history_mode(home.path(), "2025-01-03T13-05-04", uuid, ThreadHistoryMode::Legacy).unwrap();
+    append_items(&path, [
+        RolloutItem::EventMsg(EventMsg::DodexCommentaryState(DodexCommentaryStateEvent { state: saved.clone() })),
+        compacted("new context window", Some(Vec::new())),
+    ]);
+    let store = LocalThreadStore::new(test_config(home.path()), /*state_db*/ None);
+    assert_eq!(store.load_commentary_state(LoadThreadHistoryParams { thread_id, include_archived: false }).await.unwrap(), Some(saved));
+}
+
+#[tokio::test]
 async fn model_context_revision_invalidates_after_append_or_removal() {
     let home = TempDir::new().expect("temp dir");
     let uuid = Uuid::from_u128(/*v*/ 1009);

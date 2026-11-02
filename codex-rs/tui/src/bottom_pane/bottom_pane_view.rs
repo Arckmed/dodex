@@ -7,6 +7,8 @@ use crate::render::renderable::Renderable;
 use crate::terminal_program_status::ProgramStatusKind;
 use codex_app_server_protocol::ToolRequestUserInputParams;
 use crossterm::event::KeyEvent;
+use crossterm::event::MouseEvent;
+use ratatui::layout::Rect;
 use std::time::Instant;
 
 use super::CancellationEvent;
@@ -33,6 +35,11 @@ pub(crate) trait BottomPaneView: Renderable {
         ViewPresentation::Inline
     }
 
+    /// Override centered geometry for views whose layout depends on the viewport.
+    fn centered_area(&self, _viewport: Rect) -> Option<Rect> {
+        None
+    }
+
     /// Refresh an open configuration panel, including one below a child editor.
     /// Returns whether this view contains a configuration panel.
     fn update_config_panel(&mut self, _update: &crate::config_panel::ConfigPanelUpdate) -> bool {
@@ -48,6 +55,11 @@ pub(crate) trait BottomPaneView: Renderable {
     /// Handle a key event while the view is active. A redraw is always
     /// scheduled after this call.
     fn handle_key_event(&mut self, _key_event: KeyEvent) {}
+
+    /// Handle mouse input in the active view. Returning true keeps it from reaching the transcript.
+    fn handle_mouse_event(&mut self, _event: MouseEvent) -> bool {
+        false
+    }
 
     /// Handle a configured action while preserving the physical key that triggered it.
     fn handle_key_event_with_activation_key(

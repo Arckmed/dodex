@@ -50,6 +50,8 @@ pub(super) struct TranscriptState {
     pub(super) last_completed_agent_message: Option<(String, String)>,
     /// Turn and item IDs for the agent message currently supplying streamed deltas.
     pub(super) active_streamed_agent_message: Option<(String, String)>,
+    /// A stream containing deltas from multiple item IDs cannot identify one annotation source.
+    pub(super) mixed_streamed_agent_messages: bool,
     /// Turn/item identity and raw source of the latest interleaved stream flush.
     pub(super) last_flushed_agent_message: Option<((String, String), String)>,
     /// Raw markdown of the most recently completed proposed plan.
@@ -112,6 +114,7 @@ impl TranscriptState {
         self.saw_copy_source_this_turn = false;
         self.last_completed_agent_message = None;
         self.active_streamed_agent_message = None;
+        self.mixed_streamed_agent_messages = false;
         self.last_flushed_agent_message = None;
         self.saw_plan_update_this_turn = false;
         self.saw_plan_item_this_turn = false;

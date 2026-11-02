@@ -54,6 +54,25 @@ impl ChatWidget {
         self.bottom_pane.handle_composer_mouse(event)
     }
 
+    pub(crate) fn handle_view_mouse(&mut self, event: crossterm::event::MouseEvent) -> bool {
+        self.bottom_pane.handle_view_mouse(event)
+    }
+
+    pub(crate) fn commentary_can_send(&self) -> bool {
+        self.is_session_configured() && !self.blocks_direct_input
+            && !self.effective_collaboration_mode().model().trim().is_empty()
+            && !self.is_user_turn_pending_or_running() && !self.has_queued_follow_up_messages()
+            && !self.input_queue.rate_limit_recovery_pending && self.safety_recourse.is_none()
+            && !self.has_misalignment_policy_violation()
+    }
+
+    pub(crate) fn submit_commentary_batch(&mut self, text: String) -> bool {
+        if !self.commentary_can_send() { return false; }
+        self.submit_user_message_with_history_and_shell_escape_policy(
+            text.into(), UserMessageHistoryRecord::UserMessageText, ShellEscapePolicy::Disallow, UserMessageSource::Commentary,
+        ).0
+    }
+
     /// Snapshot the paste target without changing pending submissions. Unlike mouse paste,
     /// a keyboard paste may replace a composer selection or complete an active popup.
     pub(crate) fn clipboard_paste_target(

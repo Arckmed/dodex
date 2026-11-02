@@ -133,6 +133,7 @@ fn persisted_event_msg(
         EventMsg::ItemCompleted(event) => persisted_item_completed_event(ev, event, history_mode),
         EventMsg::TokenCount(_)
         | EventMsg::ThreadGoalUpdated(_)
+        | EventMsg::DodexCommentaryState(_)
         | EventMsg::ThreadRolledBack(_)
         | EventMsg::TurnAborted(_)
         | EventMsg::TurnStarted(_)

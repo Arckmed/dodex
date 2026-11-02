@@ -304,45 +304,61 @@ impl ChatWidget {
             });
         }
 
-        if !self.bottom_pane.task_mentions_enabled() {
-            mention_bindings
-                .retain(|binding| crate::task_mentions::valid_thread_path(&binding.path).is_none());
-        }
+        if source != UserMessageSource::Commentary {
+            if !self.bottom_pane.task_mentions_enabled() {
+                mention_bindings
+                    .retain(|binding| crate::task_mentions::valid_thread_path(&binding.path).is_none());
+            }
 
-        let reply_text = crate::async_question_reply::display_text(&text);
-        let mentions =
-            collect_tool_mentions(reply_text.as_deref().unwrap_or(&text), &HashMap::new());
-        let bound_names: HashSet<String> = mention_bindings
-            .iter()
-            .filter(|binding| binding.sigil == '$')
-            .map(|binding| binding.mention.clone())
-            .collect();
-        let mut skill_names_lower: HashSet<String> = HashSet::new();
-        let mut selected_skill_paths = HashSet::new();
-        let mut selected_plugin_ids: HashSet<String> = HashSet::new();
-
-        if let Some(skills) = self.bottom_pane.skills() {
-            skill_names_lower = skills
+            let reply_text = crate::async_question_reply::display_text(&text);
+            let mentions =
+                collect_tool_mentions(reply_text.as_deref().unwrap_or(&text), &HashMap::new());
+            let bound_names: HashSet<String> = mention_bindings
                 .iter()
-                .map(|skill| skill.name.to_ascii_lowercase())
+                .filter(|binding| binding.sigil == '$')
+                .map(|binding| binding.mention.clone())
                 .collect();
+            let mut skill_names_lower: HashSet<String> = HashSet::new();
+            let mut selected_skill_paths = HashSet::new();
+            let mut selected_plugin_ids: HashSet<String> = HashSet::new();
 
-            // TODO(anp): Preserve executor path identity through both structured skill input paths
-            // below and selection. UserInput::Skill still relies on host-native path interpretation.
-            for binding in &mention_bindings {
-                let path = binding
-                    .path
-                    .strip_prefix("skill://")
-                    .unwrap_or(binding.path.as_str());
-                let Some(path) = LegacyAppPathString::from_string(path).to_inferred_path_uri()
-                else {
-                    continue;
-                };
-                if let Some(skill) = skills
+            if let Some(skills) = self.bottom_pane.skills() {
+                skill_names_lower = skills
                     .iter()
-                    .find(|skill| skill.path.to_inferred_path_uri().as_ref() == Some(&path))
-                    && selected_skill_paths.insert(path)
-                {
+                    .map(|skill| skill.name.to_ascii_lowercase())
+                    .collect();
+
+                // TODO(anp): Preserve executor path identity through both structured skill input paths
+                // below and selection. UserInput::Skill still relies on host-native path interpretation.
+                for binding in &mention_bindings {
+                    let path = binding
+                        .path
+                        .strip_prefix("skill://")
+                        .unwrap_or(binding.path.as_str());
+                    let Some(path) = LegacyAppPathString::from_string(path).to_inferred_path_uri()
+                    else {
+                        continue;
+                    };
+                    if let Some(skill) = skills
+                        .iter()
+                        .find(|skill| skill.path.to_inferred_path_uri().as_ref() == Some(&path))
+                        && selected_skill_paths.insert(path)
+                    {
+                        items.push(UserInput::Skill {
+                            name: skill.name.clone(),
+                            path: PathBuf::from(skill.path.as_str()),
+                        });
+                    }
+                }
+
+                let skill_mentions = find_skill_mentions_with_tool_mentions(&mentions, skills);
+                for skill in skill_mentions {
+                    let Some(path) = skill.path.to_inferred_path_uri() else {
+                        continue;
+                    };
+                    if bound_names.contains(skill.name.as_str()) || !selected_skill_paths.insert(path) {
+                        continue;
+                    }
                     items.push(UserInput::Skill {
                         name: skill.name.clone(),
                         path: PathBuf::from(skill.path.as_str()),
@@ -350,82 +366,69 @@ impl ChatWidget {
                 }
             }
 
-            let skill_mentions = find_skill_mentions_with_tool_mentions(&mentions, skills);
-            for skill in skill_mentions {
-                let Some(path) = skill.path.to_inferred_path_uri() else {
-                    continue;
-                };
-                if bound_names.contains(skill.name.as_str()) || !selected_skill_paths.insert(path) {
-                    continue;
-                }
-                items.push(UserInput::Skill {
-                    name: skill.name.clone(),
-                    path: PathBuf::from(skill.path.as_str()),
-                });
-            }
-        }
-
-        if let Some(plugins) = self.plugins_for_mentions() {
-            for binding in &mention_bindings {
-                let Some(plugin_config_name) = binding
-                    .path
-                    .strip_prefix("plugin://")
-                    .filter(|id| !id.is_empty())
-                else {
-                    continue;
-                };
-                if !selected_plugin_ids.insert(plugin_config_name.to_string()) {
-                    continue;
-                }
-                if let Some(plugin) = plugins
-                    .iter()
-                    .find(|plugin| plugin.config_name == plugin_config_name)
-                {
-                    items.push(UserInput::Mention {
-                        name: plugin.display_name.clone(),
-                        path: binding.path.clone(),
-                    });
+            if let Some(plugins) = self.plugins_for_mentions() {
+                for binding in &mention_bindings {
+                    let Some(plugin_config_name) = binding
+                        .path
+                        .strip_prefix("plugin://")
+                        .filter(|id| !id.is_empty())
+                    else {
+                        continue;
+                    };
+                    if !selected_plugin_ids.insert(plugin_config_name.to_string()) {
+                        continue;
+                    }
+                    if let Some(plugin) = plugins
+                        .iter()
+                        .find(|plugin| plugin.config_name == plugin_config_name)
+                    {
+                        items.push(UserInput::Mention {
+                            name: plugin.display_name.clone(),
+                            path: binding.path.clone(),
+                        });
+                    }
                 }
             }
-        }
 
-        let mut selected_app_ids: HashSet<String> = HashSet::new();
-        if let Some(apps) = self.connectors_for_mentions() {
-            for binding in &mention_bindings {
-                let Some(app_id) = binding
-                    .path
-                    .strip_prefix("app://")
-                    .filter(|id| !id.is_empty())
-                else {
-                    continue;
-                };
-                if selected_app_ids.contains(app_id) {
-                    continue;
+            let mut selected_app_ids: HashSet<String> = HashSet::new();
+            if let Some(apps) = self.connectors_for_mentions() {
+                for binding in &mention_bindings {
+                    let Some(app_id) = binding
+                        .path
+                        .strip_prefix("app://")
+                        .filter(|id| !id.is_empty())
+                    else {
+                        continue;
+                    };
+                    if selected_app_ids.contains(app_id) {
+                        continue;
+                    }
+                    if let Some(app) = apps
+                        .iter()
+                        .find(|app| app.id == app_id && is_app_mentionable(app))
+                    {
+                        selected_app_ids.insert(app_id.to_string());
+                        items.push(UserInput::Mention {
+                            name: app.name.clone(),
+                            path: binding.path.clone(),
+                        });
+                    }
                 }
-                if let Some(app) = apps
-                    .iter()
-                    .find(|app| app.id == app_id && is_app_mentionable(app))
-                {
-                    selected_app_ids.insert(app_id.to_string());
+
+                let app_mentions = find_app_mentions(&mentions, apps, &skill_names_lower);
+                for app in app_mentions {
+                    let slug = codex_connectors::metadata::connector_mention_slug(&app);
+                    if bound_names.contains(&slug) || !selected_app_ids.insert(app.id.clone()) {
+                        continue;
+                    }
+                    let app_id = app.id.as_str();
                     items.push(UserInput::Mention {
                         name: app.name.clone(),
-                        path: binding.path.clone(),
+                        path: format!("app://{app_id}"),
                     });
                 }
             }
 
-            let app_mentions = find_app_mentions(&mentions, apps, &skill_names_lower);
-            for app in app_mentions {
-                let slug = codex_connectors::metadata::connector_mention_slug(&app);
-                if bound_names.contains(&slug) || !selected_app_ids.insert(app.id.clone()) {
-                    continue;
-                }
-                let app_id = app.id.as_str();
-                items.push(UserInput::Mention {
-                    name: app.name.clone(),
-                    path: format!("app://{app_id}"),
-                });
-            }
         }
 
         let effective_mode = self.effective_collaboration_mode();
@@ -446,8 +449,10 @@ impl ChatWidget {
             return (false, None);
         }
 
-        self.maybe_apply_ide_context(&mut items);
-        crate::task_mentions::apply_task_references(&mut items, &mention_bindings, self.thread_id);
+        if source != UserMessageSource::Commentary {
+            self.maybe_apply_ide_context(&mut items);
+            crate::task_mentions::apply_task_references(&mut items, &mention_bindings, self.thread_id);
+        }
 
         let collaboration_mode = if self.collaboration_modes_enabled() {
             self.active_collaboration_mask

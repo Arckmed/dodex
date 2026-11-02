@@ -817,6 +817,28 @@ pub struct ThreadUnarchiveParams {
 #[ts(export_to = "v2/")]
 pub struct ThreadSetNameResponse {}
 
+/// Read a local Commentary checkpoint from the active thread's saved history.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ThreadCommentaryGetParams { pub thread_id: String }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ThreadCommentaryGetResponse { pub state: Option<serde_json::Value> }
+
+/// Append a model-invisible Commentary checkpoint to an active thread.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ThreadCommentarySetParams { pub thread_id: String, pub state: serde_json::Value }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ThreadCommentarySetResponse {}
+
 v2_enum_from_core! {
     pub enum ThreadGoalStatus from CoreThreadGoalStatus {
         Active,

@@ -1797,9 +1797,13 @@ async fn live_app_server_turn_completion_repairs_dropped_message_deltas() {
         .filter_map(|event| match event {
             AppEvent::ConsolidateAgentMessage {
                 source,
+                source_item_id,
+                source_turn_id,
                 scrollback_reflow,
                 ..
             } => {
+                assert_eq!(source_item_id.as_deref(), Some("msg-1"));
+                assert_eq!(source_turn_id.as_deref(), Some("turn-1"));
                 assert_eq!(
                     scrollback_reflow,
                     crate::app_event::ConsolidationScrollbackReflow::Required
@@ -1833,7 +1837,11 @@ async fn live_app_server_interleaved_flush_repairs_mismatched_completion() {
         while rx.try_recv().is_ok() {}
         handle_agent_message_delta(&mut chat, "The transport kept this.");
         chat.flush_answer_stream_with_separator();
-        while rx.try_recv().is_ok() {}
+        let flushed_ids = std::iter::from_fn(|| rx.try_recv().ok()).filter_map(|event| match event {
+            AppEvent::ConsolidateAgentMessage { source_item_id, .. } => source_item_id,
+            _ => None,
+        }).collect::<Vec<_>>();
+        assert_eq!(flushed_ids, ["msg-1"]);
 
         complete_assistant_message(
             &mut chat,
@@ -1846,9 +1854,10 @@ async fn live_app_server_interleaved_flush_repairs_mismatched_completion() {
             .filter_map(|event| match event {
                 AppEvent::ConsolidateAgentMessage {
                     source,
+                    source_item_id,
                     scrollback_reflow,
                     ..
-                } => Some((source, scrollback_reflow)),
+                } => Some((source, source_item_id, scrollback_reflow)),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -1856,10 +1865,31 @@ async fn live_app_server_interleaved_flush_repairs_mismatched_completion() {
             consolidations,
             vec![(
                 completed.to_string(),
+                Some(completed_item_id.to_string()),
                 crate::app_event::ConsolidationScrollbackReflow::IfResizeReflowRan,
             )]
         );
     }
+}
+
+#[tokio::test]
+async fn mixed_stream_without_completion_does_not_claim_one_source_id() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    handle_turn_started(&mut chat, "turn-1");
+    while rx.try_recv().is_ok() {}
+    handle_agent_message_delta(&mut chat, "from the first item ");
+    chat.handle_server_notification(
+        ServerNotification::AgentMessageDelta(codex_app_server_protocol::AgentMessageDeltaNotification {
+            thread_id: "thread-1".into(), turn_id: "turn-1".into(), item_id: "msg-2".into(), delta: "and the second".into(),
+        }),
+        /*replay_kind*/ None,
+    );
+    chat.flush_answer_stream_with_separator();
+    let ids = std::iter::from_fn(|| rx.try_recv().ok()).filter_map(|event| match event {
+        AppEvent::ConsolidateAgentMessage { source_item_id, .. } => Some(source_item_id),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(ids, [None]);
 }
 
 #[tokio::test]

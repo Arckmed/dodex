@@ -1608,6 +1608,9 @@ pub enum EventMsg {
     /// Updated long-running goal metadata for the thread.
     ThreadGoalUpdated(ThreadGoalUpdatedEvent),
 
+    /// Local Commentary outbox checkpoint; not a message to the model.
+    DodexCommentaryState(DodexCommentaryStateEvent),
+
     /// A durable thread-scoped user-message queue changed.
     ThreadQueueChanged(ThreadQueueChangedEvent),
 
@@ -4413,6 +4416,14 @@ pub struct ThreadGoalUpdatedEvent {
     #[ts(optional)]
     pub turn_id: Option<String>,
     pub goal: ThreadGoal,
+}
+
+/// Versioned Commentary state stored at this point in a thread's history.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "protocol/")]
+pub struct DodexCommentaryStateEvent {
+    pub state: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema, TS)]

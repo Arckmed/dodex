@@ -107,6 +107,7 @@ mod activation_key_guard;
 mod additional_dirs;
 mod analytics;
 mod app;
+mod dodex_features;
 mod app_backtrack;
 mod app_command;
 mod app_event;

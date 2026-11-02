@@ -19,6 +19,86 @@ use pretty_assertions::assert_eq;
 use std::time::Instant;
 
 #[test]
+fn assistant_selection_preserves_the_exact_cell_and_repeated_text_offset() {
+    let cell: Arc<dyn HistoryCell> = Arc::new(AgentMarkdownCell::new("same and same".into(), std::path::Path::new(".")).with_source_item_id(Some("message-123".into())).with_source_turn_id(Some("turn-123".into())));
+    let cells = vec![Arc::clone(&cell)];
+    let mut view = TranscriptView::default();
+    render(&mut view, &cells, /*width*/ 40, /*height*/ 4);
+    let text = view.layout(&cells, 0).unwrap().text().to_owned();
+    let first = text.find("same").unwrap();
+    let second = text.rfind("same").unwrap();
+    let row = view.layout(&cells, 0).unwrap().row_for_offset(second);
+    assert_ne!(first, second);
+    view.select_copy_range(&cells, 0, second..second + 4);
+    let selected = view.selected_assistant().unwrap();
+    assert!(Arc::ptr_eq(&selected.cell, &cell));
+    assert_eq!(selected.source_item_id, "message-123");
+    assert_eq!(selected.source_turn_id, "turn-123");
+    assert_eq!(selected.display_range, second..second + 4);
+    assert_eq!(selected.display_row, row);
+    assert_eq!(selected.quotation, "same");
+    render(&mut view, &cells, /*width*/ 8, /*height*/ 5);
+    let rewrapped = view.selected_assistant().unwrap();
+    assert_eq!(rewrapped.source_item_id, "message-123");
+    assert_eq!(rewrapped.display_range, second..second + 4);
+    assert_eq!(rewrapped.quotation, "same");
+}
+
+#[test]
+fn assistant_selection_rejects_empty_nonassistant_and_cross_cell_ranges() {
+    let assistant: Arc<dyn HistoryCell> = Arc::new(AgentMarkdownCell::new("first".into(), std::path::Path::new(".")).with_source_item_id(Some("message-123".into())).with_source_turn_id(Some("turn-123".into())));
+    let other: Arc<dyn HistoryCell> = Arc::new(PlainHistoryCell::new(vec!["other".into()]));
+    let cells = vec![assistant, other];
+    let mut view = TranscriptView::default();
+    render(&mut view, &cells, /*width*/ 40, /*height*/ 5);
+    view.select_copy_range(&cells, 0, 0..0);
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::NoSelection)));
+    view.select_copy_range(&cells, 1, 0..2);
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::NotSingleAssistantMessage)));
+    view.select_copy_range(&cells, 0, 0..1);
+    let selection = view.selection.as_mut().unwrap();
+    selection.end.key = EntryKey::cell(&cells[1]);
+    selection.end.index = 1;
+    selection.end.offset = 1;
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::NotSingleAssistantMessage)));
+}
+
+#[test]
+fn assistant_selection_without_durable_item_id_is_rejected() {
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![Arc::new(AgentMarkdownCell::new("text".into(), std::path::Path::new(".")))];
+    let mut view = TranscriptView::default();
+    render(&mut view, &cells, /*width*/ 40, /*height*/ 3);
+    let text = view.layout(&cells, 0).unwrap().text().to_owned();
+    let start = text.find("text").unwrap();
+    view.select_copy_range(&cells, 0, start..start + 4);
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::SourceUnavailable)));
+}
+
+#[test]
+fn assistant_selection_without_turn_identity_is_rejected() {
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![Arc::new(AgentMarkdownCell::new("text".into(), std::path::Path::new(".")).with_source_item_id(Some("message-123".into())))];
+    let mut view = TranscriptView::default();
+    render(&mut view, &cells, /*width*/ 40, /*height*/ 3);
+    let text = view.layout(&cells, 0).unwrap().text().to_owned();
+    let start = text.find("text").unwrap();
+    view.select_copy_range(&cells, 0, start..start + 4);
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::SourceUnavailable)));
+}
+
+#[test]
+fn assistant_selection_limits_non_bmp_text_in_utf16_units() {
+    let text = "😀".repeat(25_001);
+    let cell: Arc<dyn HistoryCell> = Arc::new(AgentMarkdownCell::new(text.clone(), std::path::Path::new(".")).with_source_item_id(Some("message-123".into())).with_source_turn_id(Some("turn-123".into())));
+    let cells = vec![cell];
+    let mut view = TranscriptView::default();
+    render(&mut view, &cells, /*width*/ 80, /*height*/ 5);
+    let layout = view.layout(&cells, 0).unwrap();
+    let start = layout.text().find('😀').unwrap();
+    view.select_copy_range(&cells, 0, start..start + text.len());
+    assert!(matches!(view.selected_assistant(), Err(AssistantSelectionError::TooLarge)));
+}
+
+#[test]
 fn selection_highlights_hard_breaks_within_and_between_entries() {
     let mut frames = Vec::new();
     for (lines, end_row) in [

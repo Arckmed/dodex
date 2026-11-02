@@ -277,6 +277,7 @@ mod startup_warnings;
 mod thread_event_buffer;
 mod thread_events;
 mod thread_goal_actions;
+mod commentary;
 mod thread_routing;
 mod thread_session_state;
 mod thread_settings;
@@ -535,6 +536,9 @@ struct InitialHistoryReplayBuffer {
 }
 
 pub(crate) struct App {
+    commentary_sessions: HashMap<ThreadId, commentary::CommentarySession>,
+    commentary_active_thread: Option<ThreadId>,
+    commentary_load_id: Option<uuid::Uuid>,
     feature_write_lock: Arc<tokio::sync::Mutex<()>>,
     config_notification_test_generation: u64,
     config_notification_test_pending: Option<u64>,
@@ -869,6 +873,7 @@ impl App {
         app_server: &mut AppServerSession,
         event: TuiEvent,
     ) -> Result<AppRunControl> {
+        self.sync_commentary_thread(app_server).await;
         self.transcript_view
             .sync_patch_approval(self.chat_widget.current_patch_approval());
         tui.link_hover.observe(&event);

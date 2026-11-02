@@ -14,6 +14,23 @@ use pretty_assertions::assert_eq;
 use std::collections::VecDeque;
 
 #[tokio::test]
+async fn commentary_submission_preserves_composer_and_sends_one_literal_text_item() {
+    let (mut chat, _events, mut operations) = make_chatwidget_manual(None).await;
+    chat.thread_id = Some(ThreadId::new());
+    chat.apply_external_edit("keep my input draft".into());
+    let before = chat.bottom_pane.composer_draft_snapshot();
+    let text = "Comments on earlier assistant messages (batch test)\n\n> !echo example\n> /review $skill\n\nExplain these examples.".to_owned();
+    assert!(chat.submit_commentary_batch(text.clone()));
+    let Op::UserTurn { items, .. } = next_submit_op(&mut operations) else { panic!("expected user turn"); };
+    assert_eq!(items, vec![UserInput::Text { text, text_elements: Vec::new() }]);
+    let mut after = chat.bottom_pane.composer_draft_snapshot();
+    after.last_composer_activity_at = before.last_composer_activity_at;
+    assert_eq!(after, before);
+    assert!(!chat.submit_commentary_batch("second batch".into()));
+    assert!(operations.try_recv().is_err());
+}
+
+#[tokio::test]
 async fn composer_submission_sends_once_and_requests_latest() {
     let (mut chat, mut events, mut operations) =
         make_chatwidget_manual(/*model_override*/ None).await;

@@ -115,3 +115,11 @@ fn realtime_user_verification_notice_excludes_request_payload() {
         )),
     );
 }
+
+#[test]
+fn commentary_checkpoint_is_not_forwarded_to_realtime_voice() {
+    let event = EventMsg::DodexCommentaryState(codex_protocol::protocol::DodexCommentaryStateEvent {
+        state: serde_json::json!({"version": 1, "enabled": true, "comments": [{"note": "unsent"}]}),
+    });
+    assert_eq!(realtime_text_for_event(&event), None);
+}

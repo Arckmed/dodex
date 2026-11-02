@@ -136,6 +136,11 @@ impl ChatWidget {
                             &notification.item_id,
                         ))
                 {
+                    if self.stream_controller.is_some()
+                        && self.transcript.active_streamed_agent_message.as_ref().is_none_or(|(turn, item)| turn != &notification.turn_id || item != &notification.item_id)
+                    {
+                        self.transcript.mixed_streamed_agent_messages = true;
+                    }
                     self.transcript.active_streamed_agent_message =
                         Some((notification.turn_id, notification.item_id));
                     self.on_agent_message_delta(notification.delta);

@@ -296,6 +296,22 @@ pub(crate) struct AgentPickerThreadRefresh {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, IntoStaticStr)]
 pub(crate) enum AppEvent {
+    OpenCommentarySelection,
+    ResumeCommentaryDraft { thread_id: ThreadId },
+    CommentaryCommand { argument: String },
+    CommentaryLoaded { thread_id: ThreadId, load_id: Uuid, result: Result<Option<serde_json::Value>, String> },
+    OpenCommentaryOutbox,
+    OpenCommentarySource { thread_id: ThreadId, source: crate::dodex_features::commentary::Source },
+    OpenCommentaryReview { thread_id: ThreadId, retry_confirmed: bool },
+    CommentaryReview { thread_id: ThreadId, review_id: Uuid, event: crate::dodex_features::commentary_review::ReviewEvent },
+    CheckCommentaryReceipt { thread_id: ThreadId, attempt: u8 },
+    ResetCommentarySubmission { thread_id: ThreadId, expected_id: String, action: Option<crate::dodex_features::commentary_outbox::OutboxAction>, draft: Option<crate::dodex_features::commentary::Draft> },
+    BeginCommentaryDraft { thread_id: ThreadId, draft: crate::dodex_features::commentary::Draft, replace: bool },
+    CommentaryReader { thread_id: ThreadId, event: crate::dodex_features::commentary_reader::ReaderEvent },
+    CommentaryOutboxAction { thread_id: ThreadId, action: crate::dodex_features::commentary_outbox::OutboxAction },
+    ConfirmCommentaryRemoval { thread_id: ThreadId, comment_id: Option<String> },
+    CommentaryEditor { thread_id: ThreadId, editor_id: Uuid, event: crate::dodex_features::commentary_editor::EditorEvent },
+    SaveCommentaryCheckpoint { thread_id: ThreadId, revision: Uuid },
     AccountEmailLoaded {
         request_id: uuid::Uuid,
         email: Option<String>,
@@ -1220,6 +1236,8 @@ pub(crate) enum AppEvent {
     ConsolidateAgentMessage {
         source: String,
         copy_source: Option<String>,
+        source_item_id: Option<String>,
+        source_turn_id: Option<String>,
         cwd: PathBuf,
         inline_visualization_context: Option<InlineVisualizationContext>,
         scrollback_reflow: ConsolidationScrollbackReflow,

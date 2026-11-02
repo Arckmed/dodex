@@ -397,6 +397,8 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Commentary => self.app_event_tx.send(AppEvent::CommentaryCommand { argument: String::new() }),
+            SlashCommand::Comments => self.app_event_tx.send(AppEvent::OpenCommentaryOutbox),
             SlashCommand::Voice => {
                 self.app_event_tx.send(AppEvent::VoiceControl {
                     thread_id: self.thread_id(),
@@ -986,6 +988,7 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Commentary => self.app_event_tx.send(AppEvent::CommentaryCommand { argument: trimmed.to_owned() }),
             SlashCommand::Goal if !trimmed.is_empty() => {
                 if !self.config.features.enabled(Feature::Goals) {
                     if source == SlashCommandDispatchSource::Live {
@@ -1338,6 +1341,8 @@ impl ChatWidget {
             | SlashCommand::Presets
             | SlashCommand::Plan
             | SlashCommand::Goal
+            | SlashCommand::Commentary
+            | SlashCommand::Comments
             | SlashCommand::Side
             | SlashCommand::Btw
             | SlashCommand::Keymap

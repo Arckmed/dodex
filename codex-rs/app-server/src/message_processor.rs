@@ -1413,6 +1413,8 @@ impl MessageProcessor {
             ClientRequest::ThreadGoalGet { params, .. } => {
                 self.thread_goal_processor.thread_goal_get(params).await
             }
+            ClientRequest::ThreadCommentaryGet { params, .. } => self.thread_processor.thread_commentary_get(params).await.map(|response| Some(response.into())),
+            ClientRequest::ThreadCommentarySet { params, .. } => self.thread_processor.thread_commentary_set(params).await.map(|response| Some(response.into())),
             ClientRequest::ThreadGoalClear { params, .. } => {
                 self.thread_goal_processor
                     .thread_goal_clear(request_id.clone(), params)

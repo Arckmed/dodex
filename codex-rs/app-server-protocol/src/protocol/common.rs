@@ -633,6 +633,16 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::ThreadGoalSetResponse,
     },
+    ThreadCommentaryGet => "thread/dodex/commentary/get" {
+        params: v2::ThreadCommentaryGetParams,
+        serialization: thread_id(params.thread_id),
+        response: v2::ThreadCommentaryGetResponse,
+    },
+    ThreadCommentarySet => "thread/dodex/commentary/set" {
+        params: v2::ThreadCommentarySetParams,
+        serialization: thread_id(params.thread_id),
+        response: v2::ThreadCommentarySetResponse,
+    },
     ThreadGoalGet => "thread/goal/get" {
         params: v2::ThreadGoalGetParams,
         serialization: thread_id(params.thread_id),

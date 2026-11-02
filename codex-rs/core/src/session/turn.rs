@@ -2368,6 +2368,7 @@ pub(super) fn realtime_text_for_event(msg: &EventMsg) -> Option<RealtimeEventTex
         | EventMsg::ExitedReviewMode(_)
         | EventMsg::RawResponseItem(_)
         | EventMsg::PrivateSessionEvent(_)
+        | EventMsg::DodexCommentaryState(_)
         | EventMsg::RawResponseCompleted(_)
         | EventMsg::ItemStarted(_)
         | EventMsg::HookStarted(_)

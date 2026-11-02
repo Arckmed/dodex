@@ -64,6 +64,7 @@ pub(super) enum ShellEscapePolicy {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum UserMessageSource {
     Prompt,
+    Commentary,
     QuestionAnswer,
     SafetyRecourse,
 }

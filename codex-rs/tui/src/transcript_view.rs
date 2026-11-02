@@ -6,6 +6,7 @@
 //! Recap tail spacing is reserved by layout and never enters selectable cell content.
 
 mod activity;
+mod commentary;
 mod bookmark;
 mod composer_gap;
 mod copy_mode;
@@ -89,6 +90,7 @@ struct VisibleRow {
 
 /// Shared scrolling and interaction state for compact and detailed transcript presentations.
 pub(crate) struct TranscriptView {
+    commentary: commentary::PassageHighlights,
     pub(crate) image_protocol: Option<crate::pets::ImageProtocol>,
     pub(crate) mouse_scroll_speed: f64,
     pending_mouse_scroll: f64,
@@ -129,6 +131,7 @@ pub(crate) struct TranscriptView {
 impl Default for TranscriptView {
     fn default() -> Self {
         Self {
+            commentary: Default::default(),
             image_protocol: None,
             mouse_scroll_speed: 1.0,
             pending_mouse_scroll: 0.0,
@@ -303,6 +306,7 @@ impl TranscriptView {
         if self.tail_visible {
             self.unseen_activity = false;
         }
+        self.render_commentary(cells, buf);
         self.render_selection(buf);
         self.render_select_cursor(buf);
         if self.history == TranscriptHistoryState::LoadingBeginning && self.is_following() {
@@ -531,6 +535,15 @@ impl TranscriptView {
             offset: 0,
             row_bias: 0,
         });
+    }
+
+    pub(crate) fn jump_to_entry_offset(&mut self, cells: &[Arc<dyn HistoryCell>], index: usize, offset: usize) {
+        self.end_select_mode();
+        self.end_selection(cells);
+        self.cancel_search();
+        self.jump_to_entry(cells, index);
+        let offset = self.layout(cells, index).map(|layout| layout.text().floor_char_boundary(offset.min(layout.text().len()))).unwrap_or(0);
+        if let Position::Reading(anchor) = &mut self.position { anchor.offset = offset; }
     }
 
     pub(crate) fn cancel_beginning(&mut self) {

@@ -334,6 +334,12 @@ impl LiveThread {
             .await
     }
 
+    /// Read the latest persisted Commentary checkpoint after flushing preceding appends.
+    pub async fn load_commentary_state(&self) -> ThreadStoreResult<Option<serde_json::Value>> {
+        self.flush().await?;
+        self.thread_store.load_commentary_state(LoadThreadHistoryParams { thread_id: self.thread_id, include_archived: false }).await
+    }
+
     pub async fn read_thread(
         &self,
         include_archived: bool,
