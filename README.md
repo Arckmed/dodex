@@ -76,3 +76,22 @@ Ctrl+mouse wheel scrolls to the nearest user or assistant message in that direct
 Thoughts start hidden. `/thoughts` toggles received reasoning text and its live status headings; the preference is remembered for each conversation. Hidden reasoning remains retained, and a generic Thinking indicator remains visible during reasoning. The command only changes presentation: it does not send a model request or change reasoning effort.
 
 Timer totals and visibility preferences are stored locally under `$CODEX_HOME/dodex/conversation-ui/`. They are separate from model context and transcript exports. Timers checkpoint approximately every ten seconds and on closing a conversation; an abrupt exit can lose recent uncheckpointed time. Concurrent windows add their respective open durations to the same total.
+
+# Notes
+
+Run `bin/codex.exe` from the complete package and preserve this directory structure:
+
+```text
+codex-package.json
+bin/
+  codex.exe
+  codex-code-mode-host.exe
+  codex-exec-server.exe
+codex-resources/
+  codex-command-runner.exe
+  codex-windows-sandbox-setup.exe
+codex-path/
+  rg.exe
+```
+
+Building or copying only `codex.exe` does not supply all required runtime helpers.
