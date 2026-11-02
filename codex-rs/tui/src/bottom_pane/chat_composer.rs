@@ -264,9 +264,13 @@
 //! for IME responsiveness, but still participate in burst detection.
 //! Parent views must keep flushing editors that lose focus while input is buffered; a hidden
 //! editor's pending burst can otherwise keep the shared draw loop waiting indefinitely.
+//! A draw tick that flushes text must paint that updated draft in the same frame; repeatedly
+//! deferring successful flushes can hide continuous typing until the user pauses.
 //!
 //! Submission flushes expired characters and buffers before classifying Enter, independent of
 //! UI flush ticks. `disable_paste_burst` bypasses detection; setting it flushes and clears in-flight state.
+//! Main-composer Ctrl+A and Shift navigation share mouse selection ranges; Ctrl+X deletes
+//! only after confirmed clipboard delivery. Ctrl+C without a selection retains cancellation.
 //! Mouse edits flush pending typing; selection and copy behavior lives in [`mouse`]. Confirmed
 //! explicit copies clear the selection while preserving the draft and cursor. Footer text uses a separate
 //! read-only selection owner over its final rendered cells.
@@ -580,6 +584,8 @@ enum PendingPasteHandling {
 /// Shared composer behavior; defaults match the main chat input.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ChatComposerConfig {
+    /// Main-input keyboard selection; embedded answer editors keep their existing shortcuts.
+    pub(crate) input_selection_enabled: bool,
     /// Whether command/file/skill popups are allowed to appear.
     pub(crate) popups_enabled: bool,
     /// Whether `/...` input is parsed and dispatched as slash commands.
@@ -598,6 +604,7 @@ pub(crate) struct ChatComposerConfig {
 impl Default for ChatComposerConfig {
     fn default() -> Self {
         Self {
+            input_selection_enabled: true,
             popups_enabled: true,
             slash_commands_enabled: true,
             shell_commands_enabled: true,
@@ -613,6 +620,7 @@ impl ChatComposerConfig {
     /// Text answers support Markdown, without popups, commands, or image attachments.
     pub(crate) const fn plain_text() -> Self {
         Self {
+            input_selection_enabled: false,
             popups_enabled: false,
             slash_commands_enabled: false,
             shell_commands_enabled: false,
@@ -2042,6 +2050,17 @@ impl ChatComposer {
     }
 
     fn handle_key_event_inner(&mut self, key_event: KeyEvent) -> (InputResult, bool) {
+        if self.config.input_selection_enabled
+            && self.history_search.is_none()
+            && self.draft.textarea.vim_query().is_none()
+            && !self.blocks_direct_input
+            && self.draft.textarea.composer_selection_key(key_event)
+        {
+            let result = self.handle_input_basic(key_event);
+            self.sync_popups();
+            return result;
+        }
+
         if self.history_search.is_none()
             && !self.popups.active()
             && self.draft.textarea.wants_vim_search_key(key_event)
@@ -3863,7 +3882,11 @@ impl ChatComposer {
                 self.draft.textarea.finish_vim_repeat();
             }
         } else {
-            self.draft.textarea.input(input);
+            if !self.config.input_selection_enabled
+                || !self.draft.textarea.input_composer_selection(input)
+            {
+                self.draft.textarea.input(input);
+            }
             vim_register::sync(self);
         }
         if self.draft.textarea.prefix_insertion_revision() != prefix_insertion_revision {

@@ -736,6 +736,8 @@ impl ChatWidget {
     pub(super) fn status_line_value_for_item(&mut self, item: StatusLineItem) -> Option<String> {
         match item {
             StatusLineItem::ModelName => Some(self.model_display_name().to_string()),
+            StatusLineItem::SessionCurrent => self.conversation_view.elapsed(Instant::now()).map(|(current, _)| crate::dodex_features::conversation::timer_label("Current", current)),
+            StatusLineItem::SessionTotal => self.conversation_view.elapsed(Instant::now()).map(|(_, total)| crate::dodex_features::conversation::timer_label("Total", total)),
             StatusLineItem::ModelWithReasoning => Some(self.model_with_reasoning_display_name()),
             StatusLineItem::Reasoning => Some(self.reasoning_display_name()),
             StatusLineItem::Profile => {
@@ -874,6 +876,8 @@ impl ChatWidget {
             StatusSurfacePreviewItem::AppName => return Some("codex".to_string()),
             StatusSurfacePreviewItem::ProjectName => return self.terminal_title_project_name(),
             StatusSurfacePreviewItem::ProjectRoot => StatusLineItem::ProjectRoot,
+            StatusSurfacePreviewItem::SessionCurrent => StatusLineItem::SessionCurrent,
+            StatusSurfacePreviewItem::SessionTotal => StatusLineItem::SessionTotal,
             StatusSurfacePreviewItem::Status => return Some(self.run_state_status_text()),
             StatusSurfacePreviewItem::TaskProgress => return self.terminal_title_task_progress(),
             StatusSurfacePreviewItem::CurrentDir => StatusLineItem::CurrentDir,

@@ -31,7 +31,7 @@ fn finish_scan(view: &mut TranscriptView, cells: &[Arc<dyn HistoryCell>]) {
 }
 
 #[test]
-fn search_match_separates_user_prompts_only_while_visible() {
+fn thought_visibility_controls_search_and_prompt_separation() {
     use crate::history_cell::ReasoningSummaryCell;
     use crate::history_cell::new_user_prompt;
     use std::path::Path;
@@ -71,13 +71,19 @@ fn search_match_separates_user_prompts_only_while_visible() {
                 &cells,
             );
             finish_scan(&mut view, &cells);
+            assert_eq!(view.search.current.as_ref().unwrap().anchor.index, 2, "hidden reasoning is not searchable");
+            view.set_thoughts_visible(true);
+            view.begin_search();
+            view.paste_search("needle");
+            finish_scan(&mut view, &cells);
+            view.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL), &cells);
+            finish_scan(&mut view, &cells);
             assert_eq!(view.search.current.as_ref().unwrap().anchor.index, 1);
             assert!(view.current_layout(&cells, /*index*/ 2).unwrap().separated);
 
-            view.handle_key(
-                KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
-                &cells,
-            );
+            view.set_thoughts_visible(false);
+            view.begin_search();
+            view.paste_search("needle");
             finish_scan(&mut view, &cells);
             assert_eq!(view.search.current.as_ref().unwrap().anchor.index, 2);
             let mut buffer = Buffer::empty(area);

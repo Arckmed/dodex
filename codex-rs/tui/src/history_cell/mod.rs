@@ -159,6 +159,37 @@ pub(crate) enum HistoryRenderMode {
     Raw,
 }
 
+/// Filter only presentation. Original reasoning and grouped command details remain retained.
+pub(crate) fn thought_filtered_lines(
+    cell: &dyn HistoryCell, width: u16, visible: bool, expanded: bool,
+    mode: HistoryRenderMode, render: impl FnOnce() -> Vec<HyperlinkLine>,
+) -> Vec<HyperlinkLine> {
+    if let Some(reasoning) = cell.as_any().downcast_ref::<ReasoningSummaryCell>() {
+        if !visible { return Vec::new(); }
+        return match mode {
+            HistoryRenderMode::Rich => cell.transcript_hyperlink_lines(width),
+            HistoryRenderMode::Raw => plain_hyperlink_lines(raw_lines_from_source(reasoning.markdown_source())),
+        };
+    }
+    if expanded && let Some(exec) = cell.as_any().downcast_ref::<crate::exec_cell::ExecCell>() {
+        let lines = exec.detailed_hyperlink_lines_with_thoughts(width, mode, visible);
+        return if mode == HistoryRenderMode::Raw {
+            plain_hyperlink_lines(plain_lines(lines.into_iter().map(|line| line.line)))
+        } else { lines };
+    }
+    let mut lines = render();
+    if visible && !expanded
+        && let Some(exec) = cell.as_any().downcast_ref::<crate::exec_cell::ExecCell>()
+    {
+        let thoughts = exec.thoughts_lines(width, mode);
+        if !thoughts.is_empty() {
+            if !lines.is_empty() { lines.push(HyperlinkLine::from("")); }
+            lines.extend(thoughts);
+        }
+    }
+    lines
+}
+
 pub(crate) fn raw_lines_from_source(source: &str) -> Vec<Line<'static>> {
     if source.is_empty() {
         return Vec::new();

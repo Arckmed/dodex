@@ -5,6 +5,67 @@ use crate::history_cell::AgentMarkdownCell;
 use pretty_assertions::assert_eq;
 
 #[test]
+fn control_wheel_aligns_messages_and_skips_tools_and_continuations() {
+    use crate::history_cell::{AgentMessageCell, PlainHistoryCell, new_user_prompt};
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![
+        Arc::new(new_user_prompt("user\nline\nline".into(), vec![], vec![], vec![])),
+        Arc::new(AgentMessageCell::new(vec!["commentary".into(), "line".into(), "line".into()], true)),
+        Arc::new(PlainHistoryCell::new(vec!["tool output".into(); 6])),
+        Arc::new(AgentMessageCell::new(vec!["continuation".into()], false)),
+        Arc::new(AgentMessageCell::new(vec!["final".into(); 10], true)),
+    ];
+    let area = Rect::new(0, 0, 40, 4); let mut view = TranscriptView::default();
+    view.render(area, &mut Buffer::empty(area), &cells);
+    view.jump_to_entry(&cells, 0);
+    let mut wheel = mouse(MouseEventKind::ScrollDown, 1, 1); wheel.modifiers = KeyModifiers::CONTROL;
+    view.handle_mouse(wheel, &cells);
+    assert_eq!(view.start(&cells).0, 1, "commentary is an independent message");
+    view.handle_mouse(wheel, &cells);
+    assert_eq!(view.start(&cells).0, 4, "tools and streamed continuation are skipped");
+    view.handle_mouse(wheel, &cells);
+    assert!(view.is_following());
+    assert_eq!(view.start(&cells), view.bottom_start(&cells));
+    wheel.kind = MouseEventKind::ScrollUp; view.handle_mouse(wheel, &cells);
+    assert_eq!(view.start(&cells).0, 4);
+    view.handle_mouse(wheel, &cells);
+    assert_eq!(view.start(&cells).0, 1);
+}
+
+#[test]
+fn control_arrows_scroll_one_rendered_row() {
+    use crate::history_cell::PlainHistoryCell;
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![Arc::new(PlainHistoryCell::new((0..20).map(|i| format!("row {i}").into()).collect()))];
+    let area = Rect::new(0, 0, 40, 4); let mut view = TranscriptView::default();
+    view.render(area, &mut Buffer::empty(area), &cells);
+    let start = view.start(&cells);
+    view.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::CONTROL), &cells);
+    assert_eq!(view.start(&cells), (start.0, start.1 - 1));
+    view.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::CONTROL), &cells);
+    assert_eq!(view.start(&cells), start);
+    assert!(view.is_following());
+}
+
+#[test]
+fn thoughts_toggle_reflows_retained_history_without_deleting_source() {
+    use crate::history_cell::{PlainHistoryCell, ReasoningSummaryCell};
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![
+        Arc::new(ReasoningSummaryCell::new("heading".into(), "SECRET THOUGHT".into(), std::path::Path::new("."), true)),
+        Arc::new(PlainHistoryCell::new(vec!["visible answer".into()])),
+    ];
+    let area = Rect::new(0, 0, 60, 8); let mut view = TranscriptView::default();
+    view.set_presentation(true, HistoryRenderMode::Rich);
+    let mut buffer = Buffer::empty(area); view.render(area, &mut buffer, &cells);
+    assert!(!crate::transcript_view::tests::text(&buffer).contains("SECRET"));
+    view.set_thoughts_visible(true);
+    let mut buffer = Buffer::empty(area); view.render(area, &mut buffer, &cells);
+    assert!(crate::transcript_view::tests::text(&buffer).contains("SECRET"));
+    view.set_thoughts_visible(false);
+    let mut buffer = Buffer::empty(area); view.render(area, &mut buffer, &cells);
+    assert!(!crate::transcript_view::tests::text(&buffer).contains("SECRET"));
+    assert!(cells[0].transcript_lines(60).iter().any(|line| line.to_string().contains("SECRET")));
+}
+
+#[test]
 fn mouse_scroll_speed_scales_rows_and_accumulates_fractional_movement() {
     use crate::history_cell::PlainHistoryCell;
     use crate::transcript_view::tests::text;

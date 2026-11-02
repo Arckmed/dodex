@@ -220,6 +220,9 @@ impl App {
                 self.local_settings.tui.copy_on_select_clear_selection,
             ),
         );
+        if let Some(Overlay::Transcript(overlay)) = self.overlay.as_mut() {
+            overlay.set_thoughts_visible(self.chat_widget.conversation_view.thoughts_visible);
+        }
         if self.scrollback_has_older_history
             && let Some(Overlay::Transcript(overlay)) = self.overlay.as_mut()
         {

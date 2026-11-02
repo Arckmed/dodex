@@ -399,6 +399,7 @@ impl ChatWidget {
             }
             SlashCommand::Commentary => self.app_event_tx.send(AppEvent::CommentaryCommand { argument: String::new() }),
             SlashCommand::Comments => self.app_event_tx.send(AppEvent::OpenCommentaryOutbox),
+            SlashCommand::Thoughts => self.app_event_tx.send(AppEvent::ToggleThoughts),
             SlashCommand::Voice => {
                 self.app_event_tx.send(AppEvent::VoiceControl {
                     thread_id: self.thread_id(),
@@ -1343,6 +1344,7 @@ impl ChatWidget {
             | SlashCommand::Goal
             | SlashCommand::Commentary
             | SlashCommand::Comments
+            | SlashCommand::Thoughts
             | SlashCommand::Side
             | SlashCommand::Btw
             | SlashCommand::Keymap

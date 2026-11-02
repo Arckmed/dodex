@@ -90,6 +90,7 @@ struct VisibleRow {
 
 /// Shared scrolling and interaction state for compact and detailed transcript presentations.
 pub(crate) struct TranscriptView {
+    thoughts_visible: bool,
     commentary: commentary::PassageHighlights,
     pub(crate) image_protocol: Option<crate::pets::ImageProtocol>,
     pub(crate) mouse_scroll_speed: f64,
@@ -107,6 +108,7 @@ pub(crate) struct TranscriptView {
     live_separated: Option<Arc<TextLayout>>,
     live_key: Option<(u16, ActiveCellTranscriptKey)>,
     live_continuation: bool,
+    pub(crate) live_message: bool,
     area: Rect,
     prompt_header_target: Option<(Rect, EntryKey)>,
     suppressed_prompt_header: Option<prompt_header::SuppressedHeader>,
@@ -131,6 +133,7 @@ pub(crate) struct TranscriptView {
 impl Default for TranscriptView {
     fn default() -> Self {
         Self {
+            thoughts_visible: false,
             commentary: Default::default(),
             image_protocol: None,
             mouse_scroll_speed: 1.0,
@@ -148,6 +151,7 @@ impl Default for TranscriptView {
             live_separated: None,
             live_key: None,
             live_continuation: false,
+            live_message: false,
             area: Rect::default(),
             prompt_header_target: None,
             suppressed_prompt_header: None,
@@ -172,6 +176,50 @@ impl Default for TranscriptView {
 }
 
 impl TranscriptView {
+    pub(crate) fn set_thoughts_visible(&mut self, visible: bool) {
+        if self.thoughts_visible == visible { return; }
+        self.thoughts_visible = visible;
+        self.end_select_mode();
+        self.copy_mode = None;
+        self.release_live_reading();
+        self.cancel_search();
+        self.selection = None;
+        self.cache.clear();
+        self.live_key = None;
+    }
+
+    /// Message boundaries, rather than individual rendered chunks, define wheel stops.
+    pub(crate) fn scroll_message(&mut self, cells: &[Arc<dyn HistoryCell>], forward: bool) {
+        if self.area.is_empty() { return; }
+        let snapshot = self.snapshot_cells();
+        let cells = snapshot.as_deref().unwrap_or(cells);
+        let start = self.start(cells);
+        let bottom = self.bottom_start(cells);
+        let mut messages = Vec::new();
+        for (index, cell) in cells.iter().enumerate() {
+            let message = cell.as_any().is::<crate::history_cell::UserHistoryCell>()
+                || cell.as_any().is::<crate::history_cell::AgentMarkdownCell>()
+                || cell.as_any().is::<crate::history_cell::AgentMessageCell>();
+            if message && !cell.is_stream_continuation()
+                && let Some(layout) = self.layout(cells, index) && layout.row_count() > 0
+            {
+                messages.push((index, layout.row_for_offset(0)));
+            }
+        }
+        if self.live.is_some() && !self.live_continuation && self.live_message {
+            messages.push((cells.len(), 0));
+        }
+        let target = if forward { messages.into_iter().find(|target| *target > start) }
+            else { messages.into_iter().rev().find(|target| *target < start) };
+        let Some(target) = target else {
+            if forward { self.jump_to_latest(); }
+            else if self.history.has_unloaded_history() { self.scroll(cells, -1); }
+            return;
+        };
+        if target >= bottom { self.jump_to_latest(); return; }
+        self.jump_to_entry(cells, target.0);
+    }
+
     /// Rows left after the last render, including all startup notices and live entries.
     /// Callers can paint temporary UI here without changing selection or saved history.
     pub(crate) fn remaining_area(&self) -> Rect {

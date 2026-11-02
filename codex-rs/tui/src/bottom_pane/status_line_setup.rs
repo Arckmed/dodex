@@ -151,6 +151,11 @@ pub(crate) enum StatusLineItem {
     /// Current thread name, omitted when unnamed.
     ThreadName,
 
+    /// Time since entering the current conversation.
+    SessionCurrent,
+    /// Accumulated open time across visits to this conversation.
+    SessionTotal,
+
     /// Current thread title, falling back to its identifier when unnamed.
     ThreadTitle,
 
@@ -172,6 +177,8 @@ impl StatusLineItem {
     /// User-visible description shown in the popup.
     pub(crate) fn description(self) -> &'static str {
         match self {
+            StatusLineItem::SessionCurrent => "Time since opening this conversation",
+            StatusLineItem::SessionTotal => "Accumulated conversation open time across visits",
             StatusLineItem::ModelName => "Current model name",
             StatusLineItem::ModelWithReasoning => "Current model name with reasoning level",
             StatusLineItem::Reasoning => "Current reasoning level",
@@ -236,6 +243,8 @@ impl StatusLineItem {
 
     pub(crate) fn preview_item(self) -> StatusSurfacePreviewItem {
         match self {
+            StatusLineItem::SessionCurrent => StatusSurfacePreviewItem::SessionCurrent,
+            StatusLineItem::SessionTotal => StatusSurfacePreviewItem::SessionTotal,
             StatusLineItem::ModelName => StatusSurfacePreviewItem::Model,
             StatusLineItem::ModelWithReasoning => StatusSurfacePreviewItem::ModelWithReasoning,
             StatusLineItem::Reasoning => StatusSurfacePreviewItem::Reasoning,

@@ -36,6 +36,7 @@ fn complete(chat: &mut ChatWidget, id: &str) {
 #[tokio::test]
 async fn reasoning_status_accepts_bold_text_with_a_plain_suffix() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     handle_agent_reasoning_started(&mut chat, "reasoning");
 
@@ -65,6 +66,7 @@ async fn reasoning_status_accepts_bold_text_with_a_plain_suffix() {
 #[tokio::test]
 async fn reasoning_status_tracks_items_and_restores_after_tool_activity() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     let mut headers = Vec::new();
     let capture = |chat: &ChatWidget, headers: &mut Vec<String>| {
@@ -148,6 +150,7 @@ async fn reasoning_status_tracks_items_and_restores_after_tool_activity() {
 #[tokio::test]
 async fn voice_handoff_preserves_typed_reasoning_and_ignores_private_items() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     handle_agent_reasoning_started(&mut chat, "typed");
     delta(&mut chat, "typed", "**Checking repository**");
@@ -177,6 +180,7 @@ async fn voice_handoff_preserves_typed_reasoning_and_ignores_private_items() {
 #[tokio::test]
 async fn reasoning_status_preserves_an_explicit_wait_and_restores_the_heading() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     chat.status_state
         .pending_guardian_review_status
@@ -202,6 +206,7 @@ async fn reasoning_status_preserves_an_explicit_wait_and_restores_the_heading() 
 #[tokio::test]
 async fn reasoning_status_replay_retains_last_usable_heading() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     for (id, summary, expected) in [
         (
@@ -232,6 +237,7 @@ async fn reasoning_status_replay_retains_last_usable_heading() {
 #[tokio::test]
 async fn reasoning_status_accepts_plain_lines_and_ignores_empty_sections() {
     let (mut chat, _rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
     chat.on_task_started();
     handle_agent_reasoning_started(&mut chat, "first");
     delta(
@@ -262,6 +268,7 @@ async fn completed_reasoning_stays_in_expanded_transcript_for_live_and_replay() 
     let mut renders = Vec::new();
     for replay in [false, true] {
         let (mut chat, mut rx, _ops) = make_chatwidget_manual(/*model_override*/ None).await;
+        chat.conversation_view.thoughts_visible = true; // These tests exercise explicitly visible reasoning.
         chat.on_task_started();
         for (id, summary) in [
             ("first", "**Inspecting repository structure**"),

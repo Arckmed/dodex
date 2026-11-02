@@ -1,6 +1,5 @@
 ---
 source: tui/src/transcript_view/follow_control_tests.rs
-assertion_line: 212
 expression: "snapshots.join(\"\\n\\n\")"
 ---
 paused
@@ -10,10 +9,12 @@ Buffer {
         "one                                                                             ",
         "two                                                                             ",
         "three                                                                           ",
-        "                             ↓ Back to bottom · esc                             ",
+        "                          ↓ Back to bottom · ctrl+pgdn                          ",
     ],
     styles: [
         x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 25, y: 3, fg: Rgb(99, 168, 248), bg: Reset, underline: Reset, modifier: NONE,
+        x: 55, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]
 }
 
@@ -24,10 +25,12 @@ Buffer {
         "one                                                                             ",
         "two                                                                             ",
         "three                                                                           ",
-        "                     New activity · ↓ Back to bottom · esc                      ",
+        "                  New activity · ↓ Back to bottom · ctrl+pgdn                   ",
     ],
     styles: [
         x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 17, y: 3, fg: Rgb(99, 168, 248), bg: Reset, underline: Reset, modifier: NONE,
+        x: 62, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]
 }
 
@@ -38,12 +41,12 @@ Buffer {
         "one                                                                             ",
         "two                                                                             ",
         "three                                                                           ",
-        "                     New activity · ↓ Back to bottom · esc                      ",
+        "                  New activity · ↓ Back to bottom · ctrl+pgdn                   ",
     ],
     styles: [
         x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
-        x: 20, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: BOLD | REVERSED,
-        x: 59, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 17, y: 3, fg: Rgb(99, 168, 248), bg: Reset, underline: Reset, modifier: BOLD | REVERSED,
+        x: 62, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]
 }
 
@@ -58,5 +61,7 @@ Buffer {
     ],
     styles: [
         x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+        x: 2, y: 3, fg: Rgb(99, 168, 248), bg: Reset, underline: Reset, modifier: BOLD | REVERSED,
+        x: 18, y: 3, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
     ]
 }

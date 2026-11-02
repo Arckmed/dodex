@@ -470,7 +470,7 @@ async fn empty_enter_returns_to_latest_with_contextual_hints() -> Result<()> {
             .scroll(&app.transcript_cells, /*rows*/ -10);
         app.render_owned_transcript(&mut tui, size)?;
         let cursor = tui.terminal.last_known_cursor_pos;
-        assert!(screen(&tui).contains("enter/esc latest"));
+        assert!(screen(&tui).contains("enter/ctrl+pgdn latest"));
 
         // Release/repeat events and modified Enter must not become a navigation command.
         for key in [
@@ -488,8 +488,8 @@ async fn empty_enter_returns_to_latest_with_contextual_hints() -> Result<()> {
 
         app.chat_widget.apply_external_edit("draft".to_string());
         app.render_owned_transcript(&mut tui, size)?;
-        assert!(screen(&tui).contains("esc latest"));
-        assert!(!screen(&tui).contains("enter/esc latest"));
+        assert!(screen(&tui).contains("ctrl+pgdn latest"));
+        assert!(!screen(&tui).contains("enter/ctrl+pgdn latest"));
         app.chat_widget.apply_external_edit(String::new());
         app.transcript_cells
             .push(Arc::new(PlainHistoryCell::new(vec!["new output".into()])));
@@ -521,7 +521,7 @@ async fn empty_enter_returns_to_latest_with_contextual_hints() -> Result<()> {
             app.transcript_view
                 .scroll(&app.transcript_cells, /*rows*/ -10);
             app.render_owned_transcript(&mut tui, size)?;
-            assert!(screen(&tui).contains("enter/esc latest"));
+            assert!(screen(&tui).contains("enter/ctrl+pgdn latest"));
             while events.try_recv().is_ok() {}
             app.handle_tui_event(
                 &mut tui,
@@ -684,7 +684,7 @@ async fn enter_preserves_search_backtrack_and_modal_ownership_while_scrolled() -
 }
 
 #[tokio::test]
-async fn escape_returns_to_latest_without_changing_the_composer_draft() -> Result<()> {
+async fn ctrl_page_down_returns_to_latest_without_changing_the_composer_draft() -> Result<()> {
     let mut app = crate::app::test_support::make_test_app().await;
     let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(&app.config)).await?;
     let mut tui = crate::tui::test_support::make_test_tui()?;
@@ -702,11 +702,11 @@ async fn escape_returns_to_latest_without_changing_the_composer_draft() -> Resul
         .push(Arc::new(PlainHistoryCell::new(vec!["new output".into()])));
     app.render_owned_transcript(&mut tui, size)?;
     let before = screen(&tui);
-    assert!(before.contains("New activity · esc latest"));
+    assert!(before.contains("New activity · ctrl+pgdn latest"));
     app.handle_tui_event(
         &mut tui,
         &mut app_server,
-        TuiEvent::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
+        TuiEvent::Key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::CONTROL)),
     )
     .await?;
     app.render_owned_transcript(&mut tui, size)?;
@@ -734,6 +734,11 @@ async fn escape_returns_to_latest_without_changing_the_composer_draft() -> Resul
     assert!(!app.transcript_view.is_following());
     app.handle_tui_event(&mut tui, &mut app_server, TuiEvent::Key(escape))
         .await?;
+    assert!(!app.transcript_view.is_following());
+    app.handle_tui_event(
+        &mut tui, &mut app_server,
+        TuiEvent::Key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::CONTROL)),
+    ).await?;
     assert!(app.transcript_view.is_following());
     assert_eq!(
         app.chat_widget.composer_text_with_pending(),
@@ -983,7 +988,7 @@ async fn modified_arrows_and_editor_chords_resume_composer_movement() -> Result<
                     KeyCode::Left,
                     KeyModifiers::CONTROL | KeyModifiers::SHIFT,
                 )],
-                "Xalpha beta gamma",
+                "alpha beta X",
             ),
             (
                 vec![
@@ -997,7 +1002,7 @@ async fn modified_arrows_and_editor_chords_resume_composer_movement() -> Result<
                     KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
                     KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
                 ],
-                "aXlpha beta gamma",
+                "alpha beta gammaX",
             ),
         ] {
             app.chat_widget

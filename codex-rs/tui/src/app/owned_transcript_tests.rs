@@ -242,7 +242,7 @@ async fn older_page_loading_uses_the_status_row_without_moving_content_or_cursor
             if state == TranscriptHistoryState::Complete {
                 assert_eq!(
                     buffer_text(buffer).lines().last().unwrap().trim(),
-                    "esc latest",
+                    "ctrl+pgdn latest",
                 );
             }
             if state == TranscriptHistoryState::LoadingOlder {
@@ -2253,5 +2253,31 @@ async fn footer_selection_defers_warning_clicks_and_preserves_the_draft() -> Res
     app.render_owned_transcript(&mut tui, size)?;
     assert!((body.y..body.bottom()).contains(&row_containing(&tui, "Last line")));
     tui.set_owned_screen(/*owned*/ false)?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn composer_keyboard_selection_app_copy_and_cut_in_both_screen_modes() -> Result<()> {
+    for owned in [false, true] {
+        let mut app = crate::app::test_support::make_test_app().await;
+        let mut tui = crate::tui::test_support::make_test_tui()?;
+        tui.set_owned_screen(owned)?;
+        app.chat_widget.apply_external_edit("draft to copy".into());
+        app.chat_widget.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+        let copy = TuiEvent::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert!(app.handle_composer_copy_event(&mut tui, &copy, |_, text| {
+            assert_eq!(text, "draft to copy");
+            Ok(crate::clipboard_copy::CopyStatus::Confirmed)
+        }));
+        assert_eq!(app.chat_widget.composer_text_with_pending(), "draft to copy");
+        assert!(!app.handle_composer_copy_event(&mut tui, &copy, |_, _| unreachable!()));
+        app.chat_widget.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+        let cut = TuiEvent::Key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+        assert!(app.handle_composer_copy_event(&mut tui, &cut, |_, text| {
+            assert_eq!(text, "draft to copy");
+            Ok(crate::clipboard_copy::CopyStatus::Confirmed)
+        }));
+        assert_eq!(app.chat_widget.composer_text_with_pending(), "");
+    }
     Ok(())
 }

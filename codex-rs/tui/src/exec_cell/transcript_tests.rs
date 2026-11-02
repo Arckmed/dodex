@@ -31,6 +31,22 @@ fn completed_read(name: &str, output: &str) -> ExecCell {
 }
 
 #[test]
+fn thoughts_visibility_filters_grouped_reasoning_without_removing_other_details() {
+    let mut group = completed_read("first.txt", "first output");
+    group.group.push_detail(Arc::from(new_reasoning_summary_block(vec!["PRIVATE THOUGHT".into()], Path::new(".")) as Box<dyn HistoryCell>));
+    group.group.push_detail(Arc::new(new_unified_exec_interaction(Some("cat first.txt".into()), "continue\n".into())));
+    let render = |visible| group.detailed_hyperlink_lines_with_thoughts(80, crate::history_cell::HistoryRenderMode::Rich, visible)
+        .iter().map(|line| line.line.to_string()).collect::<Vec<_>>().join("\n");
+    assert!(!render(false).contains("PRIVATE THOUGHT"));
+    assert!(render(false).contains("continue"));
+    assert!(render(true).contains("PRIVATE THOUGHT"));
+    assert!(render(true).contains("first output"));
+    let raw_visible = crate::history_cell::thought_filtered_lines(&group, 80, true, true, crate::history_cell::HistoryRenderMode::Raw, || vec![]);
+    assert!(raw_visible.iter().any(|line| line.line.to_string().contains("PRIVATE THOUGHT")));
+    assert!(!group.raw_lines().iter().any(|line| line.to_string().contains("PRIVATE THOUGHT")), "UI visibility must not alter raw export");
+}
+
+#[test]
 fn raw_grouped_history_retains_terminal_input_and_omits_reasoning() {
     let mut group = completed_read("first.txt", "first output");
     group

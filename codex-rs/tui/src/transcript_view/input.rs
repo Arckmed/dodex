@@ -62,7 +62,7 @@ impl JumpTarget {
         }
         match (key.code, key.modifiers) {
             (KeyCode::Home, KeyModifiers::CONTROL) => Some(Self::Beginning),
-            (KeyCode::End, KeyModifiers::CONTROL) => Some(Self::Latest),
+            (KeyCode::End | KeyCode::PageDown, KeyModifiers::CONTROL) => Some(Self::Latest),
             // Zellij can omit the shifted alternate character from enhanced key events.
             (KeyCode::Char(','), modifiers)
                 if modifiers == (KeyModifiers::ALT | KeyModifiers::SHIFT) =>
@@ -159,6 +159,7 @@ impl TranscriptView {
         }
         let (code, modifiers) = crate::key_hint::normalize_key_parts(key.code, key.modifiers);
         if (code == KeyCode::Char(' ') && modifiers == KeyModifiers::CONTROL)
+            || (modifiers == KeyModifiers::CONTROL && matches!(code, KeyCode::Up | KeyCode::Down))
             || JumpTarget::from_key(key).is_some()
         {
             return true;
@@ -350,6 +351,11 @@ impl TranscriptView {
         }
         match event.kind {
             MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+                if event.modifiers == KeyModifiers::CONTROL {
+                    self.pending_mouse_scroll = 0.0;
+                    self.scroll_message(cells, event.kind == MouseEventKind::ScrollDown);
+                    return Some(ViewAction::Changed);
+                }
                 let direction = if event.kind == MouseEventKind::ScrollUp {
                     -1.0
                 } else {
@@ -488,8 +494,8 @@ impl TranscriptView {
                 .find_map(|(bindings, delta)| bindings.is_pressed(key).then_some(delta))?;
                 self.scroll(cells, delta);
             }
-            (KeyCode::Esc, KeyModifiers::NONE) if self.can_return_to_latest() => {
-                self.jump_to_latest();
+            (KeyCode::Up | KeyCode::Down, KeyModifiers::CONTROL) => {
+                self.scroll(cells, if key.code == KeyCode::Up { -1 } else { 1 });
             }
             _ if jump == Some(JumpTarget::Beginning) => {
                 self.jump_to_beginning(cells);

@@ -1171,3 +1171,17 @@ async fn retried_question_answers_keep_separate_envelopes_and_order() {
         assert_eq!(retried, original);
     }
 }
+
+#[tokio::test]
+async fn composer_keyboard_selection_escape_preserves_running_task_and_draft() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(None).await;
+    chat.bottom_pane.set_task_running(true);
+    chat.apply_external_edit("keep this draft".into());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+    chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert_eq!(chat.composer_text_with_pending(), "keep this draft");
+    assert!(chat.bottom_pane.is_task_running());
+    assert!(op_rx.try_recv().is_err());
+    let copy = crate::tui::TuiEvent::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+    assert!(chat.copy_composer_selection(&copy, |_| unreachable!()).is_none());
+}

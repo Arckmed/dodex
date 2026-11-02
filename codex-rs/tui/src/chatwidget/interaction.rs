@@ -125,6 +125,11 @@ impl ChatWidget {
         if self.handle_question_key(key_event) {
             return KeyEventAction::None;
         }
+        if !self.blocks_direct_input
+            && self.bottom_pane.clear_composer_selection_on_escape(key_event)
+        {
+            return KeyEventAction::None;
+        }
         if self.bottom_pane.has_active_view()
             && !matches!(
                 key_event,
@@ -582,9 +587,9 @@ impl ChatWidget {
     pub(crate) fn handle_paste_burst_tick(&mut self, frame_requester: FrameRequester) -> bool {
         if self.bottom_pane.flush_paste_burst_if_due() {
             self.refresh_startup_recovery();
-            // A paste just flushed; request an immediate redraw and skip this frame.
-            self.request_redraw();
-            true
+            // The draft already contains the flushed text. Render it now: deferring every
+            // successful flush can starve drawing while more typing keeps arriving.
+            false
         } else if self.is_in_paste_burst() {
             // While capturing a burst, schedule a follow-up tick and skip this frame
             // to avoid redundant renders between ticks.

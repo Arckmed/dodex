@@ -1966,6 +1966,18 @@ impl BottomPane {
         self.composer.finish_copy(completion, current)
     }
 
+    /// Draft selection cancellation takes precedence over task interruption.
+    pub(crate) fn clear_composer_selection_on_escape(&mut self, key: KeyEvent) -> bool {
+        if self.has_active_view() || self.questions.as_ref().is_some_and(|q| q.expanded) {
+            return false;
+        }
+        let handled = self.composer.clear_selection_on_escape(key);
+        if handled {
+            self.request_redraw();
+        }
+        handled
+    }
+
     pub(crate) fn copy_composer_selection(
         &mut self,
         event: &crate::tui::TuiEvent,

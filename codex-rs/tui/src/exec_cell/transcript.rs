@@ -14,10 +14,19 @@ use codex_utils_elapsed::format_duration;
 use ratatui::prelude::*;
 
 impl ExecCell {
+    pub(crate) fn thoughts_lines(&self, width: u16, mode: HistoryRenderMode) -> Vec<HyperlinkLine> {
+        self.group.details.reasoning_lines(width, mode)
+    }
     pub(super) fn detailed_hyperlink_lines(
         &self,
         width: u16,
         mode: HistoryRenderMode,
+    ) -> Vec<HyperlinkLine> {
+        self.detailed_hyperlink_lines_with_thoughts(width, mode, mode == HistoryRenderMode::Rich)
+    }
+
+    pub(crate) fn detailed_hyperlink_lines_with_thoughts(
+        &self, width: u16, mode: HistoryRenderMode, thoughts_visible: bool,
     ) -> Vec<HyperlinkLine> {
         let mut lines: Vec<HyperlinkLine> = vec![];
         for (i, call) in self.iter_calls().enumerate() {
@@ -64,7 +73,7 @@ impl ExecCell {
                     lines.push(result.into());
                 }
             }
-            lines.extend(self.group.details.lines_after(i + 1, width, mode));
+            lines.extend(self.group.details.lines_after_with_thoughts(i + 1, width, mode, thoughts_visible));
         }
         lines
     }

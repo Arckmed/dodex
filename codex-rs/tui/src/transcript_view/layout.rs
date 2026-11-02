@@ -65,13 +65,15 @@ fn cell_content_layout(
     presentation: CellPresentation,
     shortcut: Option<ShortcutHint>,
 ) -> TextLayout {
-    let mut layout = if presentation.disclosure {
+    let mut layout = if !presentation.thoughts_visible && cell.as_any().is::<crate::history_cell::ReasoningSummaryCell>() {
+        TextLayout::new(Vec::new(), width)
+    } else if presentation.disclosure {
         activity_layout(
             ActivityTranscriptLines {
                 activity: if presentation.expanded {
-                    cell.expanded_hyperlink_lines(width)
+                    crate::history_cell::thought_filtered_lines(cell, width, presentation.thoughts_visible, true, mode, || cell.expanded_hyperlink_lines(width))
                 } else {
-                    cell.compact_hyperlink_lines(width)
+                    crate::history_cell::thought_filtered_lines(cell, width, presentation.thoughts_visible, false, mode, || cell.compact_hyperlink_lines(width))
                 },
                 auxiliary: Vec::new(),
                 disclosure: cell.activity_disclosure(width),
@@ -82,7 +84,7 @@ fn cell_content_layout(
         )
     } else {
         TextLayout::new(
-            crate::history_cell::fullscreen_session_lines(cell, width, presentation.detailed, mode),
+            crate::history_cell::thought_filtered_lines(cell, width, presentation.thoughts_visible, presentation.detailed, mode, || crate::history_cell::fullscreen_session_lines(cell, width, presentation.detailed, mode)),
             width,
         )
     };
@@ -127,6 +129,7 @@ struct CachedLayout {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct CellPresentation {
+    thoughts_visible: bool,
     separated: bool,
     shares_prompt_background: bool,
     turn_tip_space: bool,
@@ -151,6 +154,7 @@ impl TranscriptView {
             self.disclosure.expanded.extend(ids);
         }
         CellPresentation {
+            thoughts_visible: self.thoughts_visible,
             separated: false,
             shares_prompt_background: false,
             turn_tip_space: false,

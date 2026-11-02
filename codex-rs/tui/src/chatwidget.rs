@@ -256,6 +256,7 @@ use crate::text_formatting::truncate_text;
 use crate::tui::FrameRequester;
 mod activity_groups;
 mod activity_presentation;
+mod conversation;
 mod command_lifecycle;
 mod config_panel;
 mod connector_mentions;
@@ -469,7 +470,11 @@ const ASK_FOR_APPROVAL_LABEL: &str = "Ask for approval";
 const APPROVE_FOR_ME_LABEL: &str = "Approve for me";
 const AUTO_REVIEW_DESCRIPTION: &str = "Only ask for actions detected as potentially unsafe";
 const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
-const DEFAULT_STATUS_LINE_ITEMS: [&str; 3] = ["model-with-reasoning", "current-dir", "thread-name"];
+const DEFAULT_STATUS_LINE_ITEMS: [&str; 11] = [
+    "model-with-reasoning", "current-dir", "thread-name", "session-current", "session-total",
+    "permissions", "context-remaining", "five-hour-limit", "codex-version", "weekly-limit",
+    "estimated-thread-cost",
+];
 
 /// Common initialization parameters shared by all `ChatWidget` constructors.
 pub(crate) struct ChatWidgetInit {
@@ -666,6 +671,7 @@ pub(crate) struct ChatWidget {
     // Preserves reasoning-summary part boundaries for transcript-only recording.
     reasoning_summary_parts: Vec<String>,
     status_state: StatusState,
+    pub(crate) conversation_view: crate::dodex_features::conversation::ConversationView,
     review: ReviewState,
     // Active hook runs render in a dedicated live cell so they can run alongside tools.
     active_hook_cell: Option<HookCell>,
@@ -1191,6 +1197,7 @@ impl ChatWidget {
     }
 
     pub(crate) fn pre_draw_tick(&mut self) {
+        self.tick_conversation_view();
         self.update_due_hook_visibility();
         self.schedule_hook_timer_if_needed();
         self.bottom_pane.pre_draw_tick();
@@ -2058,7 +2065,7 @@ impl ChatWidget {
         width: u16,
     ) -> Option<Vec<HyperlinkLine>> {
         self.active_cell_hyperlink_lines_with(width, |cell, width| {
-            cell.transcript_hyperlink_lines(width)
+            history_cell::thought_filtered_lines(cell, width, self.conversation_view.thoughts_visible, true, self.history_render_mode(), || cell.transcript_hyperlink_lines(width))
         })
     }
 

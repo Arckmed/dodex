@@ -148,7 +148,7 @@ fn joined_prompt_preserves_source_offsets_across_rewrap() {
 }
 
 #[test]
-fn detailed_only_reasoning_separates_user_prompts() {
+fn visible_reasoning_separates_user_prompts() {
     use crate::history_cell::ReasoningSummaryCell;
     use std::path::Path;
 
@@ -164,6 +164,7 @@ fn detailed_only_reasoning_separates_user_prompts() {
     ];
     let mut detailed = TranscriptView {
         detailed: true,
+        thoughts_visible: true,
         ..TranscriptView::default()
     };
     assert!(

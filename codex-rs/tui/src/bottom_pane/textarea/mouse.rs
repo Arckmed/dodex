@@ -11,6 +11,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub(super) struct MouseSelection {
     pending_copy: Option<(u64, Range<usize>)>,
+    cut_on_copy: bool,
     primary_owner: Option<Arc<()>>,
     origin: Range<usize>,
     unit: SelectionUnit,
@@ -24,7 +25,84 @@ impl TextArea {
             && let Some(selection) = &mut self.mouse_selection
         {
             selection.pending_copy = Some((id, range));
+            selection.cut_on_copy = false;
         }
+    }
+
+    pub(in crate::bottom_pane) fn defer_cut(&mut self, id: u64) {
+        self.defer_copy(id);
+        if let Some(selection) = &mut self.mouse_selection {
+            selection.cut_on_copy = true;
+        }
+    }
+
+    pub(in crate::bottom_pane) fn pending_cut(&self, id: u64) -> bool {
+        self.mouse_selection.as_ref().is_some_and(|selection| {
+            selection.cut_on_copy
+                && selection.pending_copy.as_ref().is_some_and(|pending| {
+                    pending.0 == id && self.mouse_selection_range().as_ref() == Some(&pending.1)
+                })
+        })
+    }
+
+    /// Opted into only by the main composer; other textarea users retain their keymaps.
+    pub(in crate::bottom_pane) fn composer_selection_key(&self, key: KeyEvent) -> bool {
+        let shifted = key.modifiers == KeyModifiers::SHIFT;
+        let word = key.modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+        (key.code == KeyCode::Char('a') && key.modifiers == KeyModifiers::CONTROL)
+            || (shifted && matches!(key.code, KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down | KeyCode::Home | KeyCode::End))
+            || (word && matches!(key.code, KeyCode::Left | KeyCode::Right))
+            || (key.modifiers.is_empty() && matches!(key.code, KeyCode::Esc | KeyCode::Left | KeyCode::Right) && self.mouse_selection_range().is_some())
+    }
+
+    pub(in crate::bottom_pane) fn input_composer_selection(&mut self, key: KeyEvent) -> bool {
+        if !self.composer_selection_key(key) || key.kind == KeyEventKind::Release {
+            return false;
+        }
+        self.last_click = None;
+        if key.modifiers.is_empty() {
+            if let Some(range) = self.mouse_selection_range() {
+                let position = match key.code {
+                    KeyCode::Left => range.start,
+                    KeyCode::Right => range.end,
+                    _ => self.cursor_pos,
+                };
+                self.set_cursor(position);
+            }
+            return true;
+        }
+        let select_all = key.code == KeyCode::Char('a');
+        let origin = if select_all {
+            0..0
+        } else {
+            self.mouse_selection.as_ref().map_or(
+                self.cursor_pos..self.cursor_pos,
+                |selection| selection.origin.clone(),
+            )
+        };
+        let word = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Char('a') => self.set_cursor(self.text.len()),
+            KeyCode::Left if word => self.set_cursor(self.beginning_of_previous_word()),
+            KeyCode::Right if word => self.set_cursor(self.end_of_next_word()),
+            KeyCode::Left => self.move_cursor_left(),
+            KeyCode::Right => self.move_cursor_right(),
+            KeyCode::Up => self.move_cursor_up(),
+            KeyCode::Down => self.move_cursor_down(),
+            KeyCode::Home => self.move_cursor_to_beginning_of_line(false),
+            KeyCode::End => self.move_cursor_to_end_of_line(false),
+            _ => return false,
+        }
+        self.mouse_selection = Some(MouseSelection {
+            pending_copy: None,
+            cut_on_copy: false,
+            primary_owner: None,
+            origin,
+            unit: SelectionUnit::Character,
+            dragging: false,
+            moved: true,
+        });
+        true
     }
 
     pub(in crate::bottom_pane) fn retain_primary(&mut self, owner: Option<Arc<()>>) {
@@ -50,9 +128,13 @@ impl TextArea {
         if !current || self.mouse_selection_range().as_ref() != Some(&range) {
             return None;
         }
-        let characters = self.text()[range].chars().count();
+        let characters = self.text()[range.clone()].chars().count();
         if completion.1 == Ok(crate::clipboard_copy::CopyStatus::Confirmed) {
-            self.set_cursor(self.cursor());
+            if self.mouse_selection.as_ref().is_some_and(|s| s.cut_on_copy) {
+                self.replace_range(range, "");
+            } else {
+                self.set_cursor(self.cursor());
+            }
         }
         Some(characters)
     }
@@ -143,6 +225,7 @@ impl TextArea {
                 crate::text_selection::click_count(&mut self.last_click, event.column, event.row);
             MouseSelection {
                 pending_copy: None,
+                cut_on_copy: false,
                 primary_owner: None,
                 origin: pos..pos,
                 // Padding remains an insertion target on repeated clicks.

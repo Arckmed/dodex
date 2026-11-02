@@ -102,7 +102,7 @@ impl App {
         event: &TuiEvent,
         copy: impl FnOnce(&mut tui::Tui, &str) -> Result<crate::clipboard_copy::CopyStatus, String>,
     ) -> bool {
-        if tui.is_owned_screen()
+        if (tui.is_owned_screen() || matches!(event, TuiEvent::Key(_)))
             && self.overlay.is_none()
             && !self.transcript_view.has_active_interaction()
             && let Some((char_count, result)) = self
@@ -161,6 +161,7 @@ impl App {
         let chat_widget = &self.chat_widget;
         let transcript_width = chat_widget.history_wrap_width(width);
         let view = &mut self.transcript_view;
+        view.set_thoughts_visible(chat_widget.conversation_view.thoughts_visible);
         view.mouse_scroll_speed = self.local_settings.tui.mouse_scroll_speed.unwrap_or(1.0);
         view.primary_selection = self.right_click_paste_environment.primary;
         view.copy_on_select = !commentary_enabled && self
@@ -171,6 +172,7 @@ impl App {
         view.set_keymap_bindings(&self.keymap);
         view.set_presentation(view.is_detailed(), chat_widget.history_render_mode());
         let active_key = chat_widget.active_cell_transcript_key();
+        view.live_message = chat_widget.active_transcript_is_message();
         let detailed = view.is_detailed();
         let active_ids = chat_widget.active_activity_ids();
         let expanded = view.sync_live_activity(&self.transcript_cells, active_ids)
@@ -244,9 +246,9 @@ impl App {
         );
         let composer = self.first_screen_composer();
         let latest_navigation = if self.enter_returns_to_latest() {
-            "enter/esc latest"
+            "enter/ctrl+pgdn latest"
         } else {
-            "esc latest"
+            "ctrl+pgdn latest"
         };
         self.sync_owned_transcript(area.width);
         let transcript_width = self
@@ -723,7 +725,7 @@ impl App {
         {
             return Ok(false);
         }
-        // Visible shortcut help owns Escape before returning a paused viewport to latest.
+        // Visible shortcut help owns Escape independently of return-to-latest navigation.
         // A transcript search or selection still owns Escape while it replaces the help footer.
         if let TuiEvent::Key(key) = event
             && !self.transcript_view.has_active_interaction()
@@ -738,7 +740,7 @@ impl App {
         {
             return Ok(false);
         }
-        // Prompt preview owns its navigation before ordinary Escape-to-latest scrolling.
+        // Prompt preview owns its navigation before ordinary return-to-latest scrolling.
         // Selection and search retain their existing priority and keep the prompt untouched.
         if self.backtrack.overlay_preview_active
             && !self.transcript_view.has_active_interaction()
@@ -747,7 +749,7 @@ impl App {
             self.request_owned_history(tui, app_server);
             return Ok(true);
         }
-        // Capture the origin before the first Escape returns a paused viewport to latest.
+        // Capture the origin while Escape primes prompt backtracking without scrolling to latest.
         if !self.backtrack.overlay_preview_active
             && !self.transcript_view.has_active_interaction()
             && !self.reconnect.offline
@@ -759,9 +761,6 @@ impl App {
         {
             if !self.handle_owned_backtrack_event(tui, event)? {
                 self.handle_backtrack_esc_key(tui);
-                if !self.backtrack.overlay_preview_active {
-                    self.transcript_view.jump_to_latest();
-                }
             }
             tui.frame_requester().schedule_frame();
             return Ok(true);

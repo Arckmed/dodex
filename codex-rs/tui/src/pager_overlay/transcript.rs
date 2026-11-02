@@ -34,6 +34,9 @@ pub(crate) struct TranscriptOverlay {
 }
 
 impl TranscriptOverlay {
+    pub(crate) fn set_thoughts_visible(&mut self, visible: bool) {
+        self.view.set_thoughts_visible(visible);
+    }
     pub(crate) fn bookmark(&mut self) -> TranscriptBookmark {
         self.view.bookmark(&self.cells)
     }

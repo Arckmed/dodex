@@ -874,6 +874,8 @@ impl App {
         event: TuiEvent,
     ) -> Result<AppRunControl> {
         self.sync_commentary_thread(app_server).await;
+        let displayed_thread = self.current_displayed_thread_id();
+        self.chat_widget.sync_conversation_view(displayed_thread);
         self.transcript_view
             .sync_patch_approval(self.chat_widget.current_patch_approval());
         tui.link_hover.observe(&event);

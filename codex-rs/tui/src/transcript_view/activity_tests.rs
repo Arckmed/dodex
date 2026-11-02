@@ -62,7 +62,7 @@ fn unchanged_live_revisions_do_not_report_activity_but_hidden_text_does() {
 }
 
 #[test]
-fn escape_closes_selection_and_search_before_returning_to_latest() {
+fn escape_closes_selection_and_search_and_ctrl_page_down_returns_to_latest() {
     let mut cells = vec![cell("one\ntwo\nthree\nfour")];
     let mut view = TranscriptView::default();
     render(&mut view, &cells, /*height*/ 3);
@@ -78,8 +78,10 @@ fn escape_closes_selection_and_search_before_returning_to_latest() {
     view.handle_key(escape, &cells);
     assert!(!view.is_search_editing());
     assert!(!view.is_following());
+    assert!(view.handle_key(escape, &cells).is_none());
+    assert!(!view.is_following());
     assert!(matches!(
-        view.handle_key(escape, &cells),
+        view.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::CONTROL), &cells),
         Some(ViewAction::Changed)
     ));
     assert!(view.is_following());

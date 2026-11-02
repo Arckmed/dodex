@@ -56,7 +56,10 @@ impl App {
     pub(super) fn finish_clipboard(&mut self, tui: &mut tui::Tui, event: &TuiEvent) {
         let current = tui.is_owned_screen() && self.overlay.is_none();
         if let Some(completion) = tui.clipboard.poll() {
-            if let Some(characters) = self.chat_widget.finish_clipboard(completion, current) {
+            if let Some(characters) = self.chat_widget.finish_clipboard(
+                completion,
+                self.overlay.is_none(),
+            ) {
                 self.transcript_view
                     .show_copy_feedback(&completion.1, characters);
             }

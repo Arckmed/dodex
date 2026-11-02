@@ -56,7 +56,7 @@ impl ChatWidget {
             latest_summary_line(&self.reasoning_buffer).or(self.reasoning_header.take());
         if let Some(header) = self.reasoning_header.clone() {
             self.status_state.terminal_title_status_kind = TerminalTitleStatusKind::Thinking;
-            self.set_status_header(header);
+            self.set_status_header(if self.conversation_view.thoughts_visible { header } else { "Thinking".into() });
         } else if self.bottom_pane.is_task_running()
             || self.status_state.current_status.is_guardian_review()
         {
@@ -378,7 +378,7 @@ impl ChatWidget {
         }
 
         // Update the shimmer header to the extracted reasoning chunk header.
-        let header = header.to_string();
+        let header = if self.conversation_view.thoughts_visible { header.to_string() } else { "Thinking".to_string() };
         self.status_state.terminal_title_status_kind = TerminalTitleStatusKind::Thinking;
         if !self.set_status_header(header) {
             self.request_redraw();

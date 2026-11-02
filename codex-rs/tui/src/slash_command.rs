@@ -45,6 +45,7 @@ pub enum SlashCommand {
     Voice,
     Goal,
     Commentary,
+    Thoughts,
     Comments,
     Agents,
     Side,
@@ -145,6 +146,7 @@ impl SlashCommand {
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Commentary => "annotate assistant passages; on, off, add, browse, review, send",
             SlashCommand::Comments => "review pending passage annotations",
+            SlashCommand::Thoughts => "toggle thought visibility for this conversation",
             SlashCommand::Agents => "open the agent command center",
             SlashCommand::MultiAgents => "switch between this session's subagents",
             SlashCommand::Side | SlashCommand::Btw => {
@@ -300,6 +302,7 @@ impl SlashCommand {
             | SlashCommand::Goal
             | SlashCommand::Commentary
             | SlashCommand::Comments
+            | SlashCommand::Thoughts
             | SlashCommand::Voice
             | SlashCommand::Mcp
             | SlashCommand::Apps

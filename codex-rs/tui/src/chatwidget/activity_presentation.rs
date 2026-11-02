@@ -5,6 +5,13 @@ use super::*;
 use crate::transcript_view::ActivityTranscriptLines;
 
 impl ChatWidget {
+    pub(crate) fn active_transcript_is_message(&self) -> bool {
+        self.transcript.active_cell.as_deref().is_some_and(|cell| {
+            cell.as_any().is::<history_cell::AgentMessageCell>()
+                || cell.as_any().is::<history_cell::StreamingAgentTailCell>()
+                || cell.as_any().is::<history_cell::AgentMarkdownCell>()
+        })
+    }
     pub(crate) fn active_activity_ids(&self) -> Vec<String> {
         self.transcript
             .active_cell
@@ -21,19 +28,22 @@ impl ChatWidget {
         let active = self.transcript.active_cell.as_deref();
         let mode = self.history_render_mode();
         let render_compact = |cell: &dyn HistoryCell, width| {
+            if cell.as_any().is::<history_cell::ReasoningSummaryCell>() {
+                return history_cell::thought_filtered_lines(cell, width, self.conversation_view.thoughts_visible, true, mode, || cell.transcript_hyperlink_lines(width));
+            }
             if cell.as_any().is::<history_cell::SessionInfoCell>() {
                 history_cell::fullscreen_session_lines(cell, width, /*detailed*/ false, mode)
             } else if mode == HistoryRenderMode::Raw {
                 cell.display_hyperlink_lines_for_mode(width, mode)
             } else {
-                cell.compact_hyperlink_lines(width)
+                history_cell::thought_filtered_lines(cell, width, self.conversation_view.thoughts_visible, false, mode, || cell.compact_hyperlink_lines(width))
             }
         };
         let has_activity = mode == HistoryRenderMode::Rich
             && active.is_some_and(|cell| !cell.activity_ids().is_empty());
         let activity = active.map_or_else(Vec::new, |cell| {
             if expanded && has_activity {
-                cell.expanded_hyperlink_lines(width)
+                history_cell::thought_filtered_lines(cell, width, self.conversation_view.thoughts_visible, true, mode, || cell.expanded_hyperlink_lines(width))
             } else {
                 render_compact(cell, width)
             }

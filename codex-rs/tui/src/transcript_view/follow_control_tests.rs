@@ -239,7 +239,7 @@ fn copying_live_selection_retains_the_displayed_revision() {
     assert!(view.follow_control.area.is_some());
     assert!(format!("{buffer:?}").contains("original live text"));
     assert!(
-        crate::transcript_view::tests::text(&buffer).contains("New activity · ↓ Back to bottom")
+        crate::transcript_view::tests::text(&buffer).contains("New activity · ↓ Bottom")
     );
     view.jump_to_latest();
     let buffer = paint(&mut view, &cells, /*width*/ 40);

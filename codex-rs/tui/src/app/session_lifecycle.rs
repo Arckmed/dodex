@@ -495,6 +495,9 @@ impl App {
     /// This helper copies every known nickname/role from `AgentNavigationState` into the
     /// replacement widget so that replayed collab items render agent names immediately.
     pub(super) fn replace_chat_widget(&mut self, mut chat_widget: ChatWidget) {
+        // Rebuilding the same view (for example after reconnect) is not another visit.
+        // The canonical thread switch subsequently checkpoints and resets a different thread.
+        chat_widget.conversation_view = std::mem::take(&mut self.chat_widget.conversation_view);
         chat_widget.fork_in_progress = self.chat_widget.fork_in_progress;
         self.pending_right_click_paste = None;
         self.config_notification_test_pending = None;

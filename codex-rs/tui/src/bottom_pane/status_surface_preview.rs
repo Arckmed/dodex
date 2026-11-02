@@ -8,6 +8,8 @@ use super::status_line_setup::StatusLineItem;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum StatusSurfacePreviewItem {
+    SessionCurrent,
+    SessionTotal,
     AppName,
     ProjectName,
     ProjectRoot,
@@ -55,6 +57,8 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::Hostname => "my-host",
             StatusSurfacePreviewItem::Status => "Working",
             StatusSurfacePreviewItem::ThreadName => "thread name",
+            StatusSurfacePreviewItem::SessionCurrent => "Current 00:10:00",
+            StatusSurfacePreviewItem::SessionTotal => "Total 00:30:00",
             StatusSurfacePreviewItem::ThreadTitle => "thread title",
             StatusSurfacePreviewItem::GitBranch => "feat/awesome-feature",
             StatusSurfacePreviewItem::PullRequestNumber => "PR #123",
@@ -95,6 +99,8 @@ impl StatusSurfacePreviewItem {
             Self::Hostname,
             Self::Status,
             Self::ThreadName,
+            Self::SessionCurrent,
+            Self::SessionTotal,
             Self::ThreadTitle,
             Self::GitBranch,
             Self::PullRequestNumber,

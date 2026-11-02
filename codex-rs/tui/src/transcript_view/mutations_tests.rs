@@ -400,6 +400,7 @@ fn folding_a_reasoning_only_page_retains_its_find_and_copy_revision() {
     for selecting in [false, true] {
         let mut cells = project(&current.items[1..]);
         let mut view = TranscriptView::default();
+        view.set_thoughts_visible(true);
         view.set_presentation(/*detailed*/ true, HistoryRenderMode::Rich);
         view.jump_to_entry(&cells, /*index*/ 0);
         render(&mut view, &cells, /*width*/ 30);

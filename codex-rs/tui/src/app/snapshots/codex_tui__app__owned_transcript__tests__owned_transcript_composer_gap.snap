@@ -1,6 +1,5 @@
 ---
 source: tui/src/app/owned_transcript_tests.rs
-assertion_line: 350
 expression: "snapshots.join(\"\\n\\n\")"
 ---
 Latest
@@ -24,33 +23,33 @@ Transcript row 32
 Transcript row 33
 Transcript row 34
 Transcript row 35
-                             ↓ Back to bottom · esc
+                          ↓ Back to bottom · ctrl+pgdn
 
 › draft
 
   gpt-test default · /tmp/project
-  esc latest
+  ctrl+pgdn latest
 
 Resized multiline composer
 Transcript row 30
 Transcript row 31
 Transcript row 32
 Transcript row 33
-         ↓ Back to bottom · esc
+      ↓ Back to bottom · ctrl+pgdn
 
 › draft
   second line
   third line
 
   gpt-test default · /tmp/project
-  esc latest
+  ctrl+pgdn latest
 
 Tiny terminal
 
 › draft
 
   gpt-test default · /tmp/project
-  esc latest
+  ctrl+pgdn latest
 
 Detailed
 • Viewed image assets/detail-image.png

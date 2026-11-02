@@ -179,12 +179,21 @@ impl App {
             return Ok(AppRunControl::Continue);
         }
         if matches!(&event, AppEvent::Exit(_) | AppEvent::ConfirmedEmbeddedExit(_)) {
+            if let Err(error) = self.chat_widget.conversation_view.save(Instant::now(), None) {
+                tracing::warn!(%error, "Could not checkpoint conversation open time on exit");
+            }
             self.flush_commentary_checkpoints(app_server).await;
         }
         if matches!(&event, AppEvent::CommentaryLoaded { .. } | AppEvent::CheckCommentaryReceipt { .. } | AppEvent::CommentaryCommand { .. }) {
             tui.frame_requester().schedule_frame();
         }
         match event {
+            AppEvent::ToggleThoughts => {
+                let thread = self.current_displayed_thread_id();
+                self.chat_widget.sync_conversation_view(thread);
+                self.chat_widget.toggle_thoughts();
+                tui.frame_requester().schedule_frame();
+            }
             AppEvent::OpenCommentarySelection => self.open_commentary_selection(app_server).await,
             AppEvent::ResumeCommentaryDraft { thread_id } => self.edit_commentary_draft(app_server, thread_id).await,
             AppEvent::CommentaryCommand { argument } => self.handle_commentary_command(app_server, &argument).await,

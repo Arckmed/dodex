@@ -60,7 +60,7 @@ impl TranscriptView {
         }
         let labels = if self.unseen_activity {
             [
-                " New activity · ↓ Back to bottom · esc ",
+                " New activity · ↓ Back to bottom · ctrl+pgdn ",
                 " New activity · ↓ Bottom ",
                 " New · ↓ Bottom ",
                 " ↓ Bottom ",
@@ -68,9 +68,9 @@ impl TranscriptView {
             ]
         } else {
             [
-                " ↓ Back to bottom · esc ",
+                " ↓ Back to bottom · ctrl+pgdn ",
                 " ↓ Back to bottom ",
-                " ↓ Bottom · esc ",
+                " ↓ Bottom · ctrl+pgdn ",
                 " ↓ Bottom ",
                 " ↓ ",
             ]

@@ -334,3 +334,184 @@ fn selection_release_reports_only_clipboard_result() {
         assert_eq!(composer.draft.textarea.mouse_selection_range(), selection);
     }
 }
+
+fn selection_key(composer: &mut ChatComposer, code: KeyCode, modifiers: KeyModifiers) {
+    composer.handle_key_event(KeyEvent::new(code, modifiers));
+}
+
+#[test]
+fn composer_keyboard_selection_select_all_copy_and_replace() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.draft.disable_paste_burst = true;
+    composer.insert_str("first\n第二 👩‍💻");
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(composer.draft.textarea.mouse_selection_range(), Some(0..composer.current_text().len()));
+    let event = TuiEvent::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+    composer.copy_selection(&event, |text| {
+        assert_eq!(text, "first\n第二 👩‍💻");
+        Ok(CopyStatus::Confirmed)
+    });
+    assert_eq!(composer.current_text(), "first\n第二 👩‍💻");
+    assert!(composer.draft.textarea.mouse_selection_range().is_none());
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    composer.handle_paste("replacement".into());
+    assert_eq!(composer.current_text(), "replacement");
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    selection_key(&mut composer, KeyCode::Char('Z'), KeyModifiers::SHIFT);
+    assert_eq!(composer.current_text(), "Z");
+}
+
+#[test]
+fn composer_keyboard_selection_extends_reverses_and_collapses() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("a👩‍💻z");
+    selection_key(&mut composer, KeyCode::Left, KeyModifiers::SHIFT);
+    assert_eq!(&composer.current_text()[composer.draft.textarea.mouse_selection_range().unwrap()], "z");
+    selection_key(&mut composer, KeyCode::Left, KeyModifiers::SHIFT);
+    assert_eq!(&composer.current_text()[composer.draft.textarea.mouse_selection_range().unwrap()], "👩‍💻z");
+    selection_key(&mut composer, KeyCode::Right, KeyModifiers::SHIFT);
+    selection_key(&mut composer, KeyCode::Left, KeyModifiers::NONE);
+    assert_eq!(composer.draft.textarea.cursor(), "a👩‍💻".len());
+    assert!(composer.draft.textarea.mouse_selection_range().is_none());
+    selection_key(&mut composer, KeyCode::Right, KeyModifiers::SHIFT);
+    selection_key(&mut composer, KeyCode::Right, KeyModifiers::NONE);
+    assert_eq!(composer.draft.textarea.cursor(), composer.current_text().len());
+    selection_key(&mut composer, KeyCode::Left, KeyModifiers::SHIFT);
+    let cursor = composer.draft.textarea.cursor();
+    selection_key(&mut composer, KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(composer.draft.textarea.cursor(), cursor);
+    assert_eq!(composer.current_text(), "a👩‍💻z");
+    assert!(composer.draft.textarea.mouse_selection_range().is_none());
+}
+
+#[test]
+fn composer_keyboard_selection_words_lines_and_vertical_navigation() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("one two\nthree");
+    selection_key(&mut composer, KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+    assert_eq!(&composer.current_text()[composer.draft.textarea.mouse_selection_range().unwrap()], "three");
+    selection_key(&mut composer, KeyCode::Esc, KeyModifiers::NONE);
+    composer.draft.textarea.set_cursor(0);
+    selection_key(&mut composer, KeyCode::Right, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+    assert_eq!(&composer.current_text()[composer.draft.textarea.mouse_selection_range().unwrap()], "one");
+    selection_key(&mut composer, KeyCode::End, KeyModifiers::SHIFT);
+    assert_eq!(&composer.current_text()[composer.draft.textarea.mouse_selection_range().unwrap()], "one two");
+    selection_key(&mut composer, KeyCode::Home, KeyModifiers::SHIFT);
+    assert!(composer.draft.textarea.mouse_selection_range().is_none());
+    selection_key(&mut composer, KeyCode::Down, KeyModifiers::SHIFT);
+    assert!(composer.draft.textarea.mouse_selection_range().is_some());
+    selection_key(&mut composer, KeyCode::Up, KeyModifiers::SHIFT);
+    assert!(composer.draft.textarea.mouse_selection_range().is_none());
+}
+
+#[test]
+fn composer_keyboard_selection_delete_and_atomic_placeholders() {
+    for code in [KeyCode::Backspace, KeyCode::Delete] {
+        let (mut composer, _rx) = new_test_composer();
+        composer.handle_paste("x".repeat(LARGE_PASTE_CHAR_THRESHOLD + 1));
+        assert!(!composer.draft.pending_pastes.is_empty());
+        selection_key(&mut composer, KeyCode::Left, KeyModifiers::SHIFT);
+        assert_eq!(composer.draft.textarea.mouse_selection_range(), Some(0..composer.current_text().len()));
+        selection_key(&mut composer, code, KeyModifiers::NONE);
+        assert_eq!(composer.current_text(), "");
+        assert!(composer.draft.pending_pastes.is_empty());
+    }
+}
+
+#[test]
+fn composer_keyboard_selection_cut_waits_for_confirmation_and_rejects_stale_results() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("keep me");
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    let cut = TuiEvent::Key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    composer.copy_selection(&cut, |_| Err("clipboard failed".into()));
+    assert_eq!(composer.current_text(), "keep me");
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Unconfirmed));
+    assert_eq!(composer.current_text(), "keep me");
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(10)));
+    assert_eq!(composer.current_text(), "keep me");
+    composer.finish_copy(&(10, Err("failed".into())), true);
+    assert_eq!(composer.current_text(), "keep me");
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(11)));
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(composer.finish_copy(&(11, Ok(CopyStatus::Confirmed)), true), None);
+    assert_eq!(composer.current_text(), "keep me");
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(12)));
+    composer.insert_str("new draft");
+    assert_eq!(composer.finish_copy(&(12, Ok(CopyStatus::Confirmed)), true), None);
+    assert_eq!(composer.current_text(), "new draft");
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(13)));
+    assert_eq!(composer.finish_copy(&(13, Ok(CopyStatus::Confirmed)), true), Some(9));
+    assert_eq!(composer.current_text(), "");
+}
+
+#[test]
+fn composer_keyboard_selection_cut_reconciles_placeholder_payloads() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.handle_paste("x".repeat(LARGE_PASTE_CHAR_THRESHOLD + 1));
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    let cut = TuiEvent::Key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(20)));
+    composer.finish_copy(&(20, Ok(CopyStatus::Confirmed)), true);
+    assert_eq!(composer.current_text(), "");
+    assert!(composer.draft.pending_pastes.is_empty());
+    assert_eq!(composer.copy_selection(&cut, |_| unreachable!()), None);
+}
+
+#[test]
+fn composer_keyboard_selection_flushes_pending_typing_before_select_all() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("hello");
+    composer.draft.paste_burst.begin_with_retro_grabbed(" world".into(), Instant::now());
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(composer.current_text(), "hello world");
+    assert_eq!(composer.draft.textarea.mouse_selection_range(), Some(0..11));
+}
+
+#[test]
+fn composer_keyboard_selection_does_not_change_other_textarea_shortcuts() {
+    let mut textarea = super::super::super::textarea::TextArea::new();
+    textarea.insert_str("hello");
+    textarea.input(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+    assert_eq!(textarea.cursor(), 0);
+    assert!(textarea.mouse_selection_range().is_none());
+    let (mut embedded, _rx) = new_test_composer();
+    embedded.config = ChatComposerConfig::plain_text();
+    embedded.insert_str("embedded answer");
+    selection_key(&mut embedded, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(embedded.draft.textarea.cursor(), 0);
+    assert!(embedded.draft.textarea.mouse_selection_range().is_none());
+}
+
+#[test]
+fn composer_keyboard_selection_immediate_cut_and_hidden_completion() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("keep");
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    let cut = TuiEvent::Key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Pending(30)));
+    assert_eq!(composer.finish_copy(&(30, Ok(CopyStatus::Confirmed)), false), None);
+    assert_eq!(composer.current_text(), "keep");
+    composer.copy_selection(&cut, |_| Ok(CopyStatus::Confirmed));
+    assert_eq!(composer.current_text(), "");
+}
+
+#[test]
+fn composer_keyboard_selection_wrap_resize_and_popup() {
+    let (mut composer, _rx) = new_test_composer();
+    composer.insert_str("abcdefghij klmnopqrst uvwxyz");
+    let area = Rect::new(0, 0, 12, 8);
+    composer.render(area, &mut Buffer::empty(area));
+    selection_key(&mut composer, KeyCode::Up, KeyModifiers::SHIFT);
+    let selected = composer.draft.textarea.mouse_selection_range().unwrap();
+    assert!(selected.start > 0);
+    let resized = Rect::new(0, 0, 30, 6);
+    composer.render(resized, &mut Buffer::empty(resized));
+    assert_eq!(composer.draft.textarea.mouse_selection_range(), Some(selected));
+    composer.set_text_content("/".into(), Vec::new(), Vec::new());
+    composer.sync_popups();
+    selection_key(&mut composer, KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(composer.draft.textarea.mouse_selection_range(), Some(0..1));
+    assert!(!composer.popups.active());
+}

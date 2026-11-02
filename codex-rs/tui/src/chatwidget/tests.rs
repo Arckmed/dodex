@@ -271,6 +271,8 @@ mod permission_picker_tests;
 #[path = "tests/permission_shortcuts_tests.rs"]
 mod permission_shortcuts_tests;
 mod permissions;
+mod paste_burst_redraw_tests;
+mod conversation_tests;
 mod plan_mode;
 #[path = "tests/plugin_catalog_tests.rs"]
 mod plugin_catalog;

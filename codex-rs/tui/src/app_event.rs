@@ -296,6 +296,7 @@ pub(crate) struct AgentPickerThreadRefresh {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, IntoStaticStr)]
 pub(crate) enum AppEvent {
+    ToggleThoughts,
     OpenCommentarySelection,
     ResumeCommentaryDraft { thread_id: ThreadId },
     CommentaryCommand { argument: String },

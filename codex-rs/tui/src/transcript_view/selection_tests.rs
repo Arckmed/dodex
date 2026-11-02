@@ -477,6 +477,8 @@ fn live_selection_survives_commits_finalization_new_live_content_and_resize() {
     assert!(!view.is_following());
     assert!(view.selection.is_none());
     view.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), &cells);
+    assert!(!view.is_following());
+    view.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::CONTROL), &cells);
     assert!(view.is_following());
     assert!(render(&mut view, &cells, /*width*/ 32, /*height*/ 5).contains("unrelated next tail"));
 }
@@ -612,7 +614,7 @@ fn plain_and_shift_arrows_move_selection_on_press_and_repeat() {
 }
 
 #[test]
-fn modified_arrows_end_selection_and_return_input_to_the_owner() {
+fn modified_arrows_scroll_selection_or_return_input_to_the_owner() {
     let cells = vec![agent(&["alpha beta gamma"])];
     for kind in [KeyEventKind::Press, KeyEventKind::Repeat] {
         for modifier in [
@@ -631,13 +633,13 @@ fn modified_arrows_end_selection_and_return_input_to_the_owner() {
                         &cells, /*column*/ 9, /*row*/ 0, /*clicks*/ 2,
                     );
                     assert_eq!(view.selected_text(&cells).as_deref(), Some("beta"));
-                    assert!(
-                        view.handle_key(KeyEvent::new_with_kind(code, modifiers, kind), &cells)
-                            .is_none()
-                    );
+                    let handled = view.handle_key(KeyEvent::new_with_kind(code, modifiers, kind), &cells);
+                    let scrolls_transcript = modifiers == KeyModifiers::CONTROL
+                        && matches!(code, KeyCode::Up | KeyCode::Down);
+                    assert_eq!(handled.is_some(), scrolls_transcript);
                     assert_eq!(
                         (view.has_active_interaction(), view.selected_text(&cells)),
-                        (false, None)
+                        if scrolls_transcript { (true, Some("beta".to_owned())) } else { (false, None) }
                     );
                 }
             }
