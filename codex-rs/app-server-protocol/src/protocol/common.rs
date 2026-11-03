@@ -506,6 +506,12 @@ client_request_definitions! {
         response: v1::InitializeResponse,
     },
 
+    DodexCapabilities => "dodex/capabilities" {
+        params: v2::DodexCapabilitiesParams,
+        serialization: None,
+        response: v2::DodexCapabilitiesResponse,
+    },
+
     #[experimental("server/diagnostics")]
     /// Read content-free, process-local diagnostics.
     ServerDiagnostics => "server/diagnostics" {

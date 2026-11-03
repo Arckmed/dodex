@@ -20,7 +20,7 @@ enum InitialDaemon {
 
 fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
     let mut daemon = TestDaemon::new()?;
-    let standalone = daemon.home.path().join("packages/standalone");
+    let standalone = daemon.home.path().join("packages/dodex-standalone");
     let package = if action == "start" && initial == InitialDaemon::Missing {
         standalone.join("releases/caller")
     } else {
@@ -66,7 +66,7 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
         std::os::unix::fs::symlink(&package, standalone.join("current"))?;
     }
     let cli_selection = standalone.join("current").canonicalize()?;
-    let state = daemon.home.path().join("app-server-daemon");
+    let state = daemon.home.path().join("dodex-server-daemon");
     if initial == InitialDaemon::Missing {
         std::fs::remove_file(state.join("app-server.stderr.log"))?;
     }
@@ -94,7 +94,7 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
         .home
         .path()
         .canonicalize()?
-        .join("packages/app-server-daemon");
+        .join("packages/dodex-server-daemon");
     let (initial_root, initial_pid_file) = match initial {
         InitialDaemon::Missing => (&dedicated, "daemon.pid"),
         InitialDaemon::Legacy => (&standalone, "app-server.pid"),

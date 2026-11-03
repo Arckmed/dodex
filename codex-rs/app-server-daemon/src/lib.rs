@@ -65,7 +65,11 @@ const DAEMON_PID_FILE_NAME: &str = "daemon.pid";
 const DAEMON_UPDATE_PID_FILE_NAME: &str = "daemon-updater.pid";
 const OPERATION_LOCK_FILE_NAME: &str = "daemon.lock";
 const SETTINGS_FILE_NAME: &str = "settings.json";
-const STATE_DIR_NAME: &str = "app-server-daemon";
+const STATE_DIR_NAME: &str = "dodex-server-daemon";
+
+// Official release installers cannot supply the Dodex protocol. Keep local
+// package replacement available, but never launch their download/update loop.
+const PUBLIC_RELEASE_UPDATES_ENABLED: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LifecycleCommand {
@@ -114,6 +118,11 @@ pub struct BootstrapOptions {
 /// app-server version.
 pub async fn probe_app_server_version(socket_path: &Path) -> Result<String> {
     Ok(client::probe(socket_path).await?.app_server_version)
+}
+
+/// Verify the extension protocol before a terminal restores Dodex state.
+pub async fn verify_dodex_protocol(socket_path: &Path) -> Result<()> {
+    client::verify_dodex_protocol(socket_path).await
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -358,7 +367,7 @@ impl Daemon {
         let managed_codex_bin = managed_codex_bin(codex_home.as_path());
         // Old CLIs must not mistake a daemon-owned installation for their backend.
         let (pid_file, update_pid_file) =
-            if managed_codex_bin.starts_with(codex_home.as_path().join("packages/standalone")) {
+            if managed_codex_bin.starts_with(codex_home.as_path().join("packages/dodex-standalone")) {
                 (LEGACY_PID_FILE_NAME, LEGACY_UPDATE_PID_FILE_NAME)
             } else {
                 (DAEMON_PID_FILE_NAME, DAEMON_UPDATE_PID_FILE_NAME)
@@ -400,7 +409,7 @@ impl Daemon {
             .parent()
             .and_then(Path::parent)
             .context("daemon settings path has no Codex home")?;
-        let (pid, updater) = if managed_codex_bin.starts_with(home.join("packages/standalone")) {
+        let (pid, updater) = if managed_codex_bin.starts_with(home.join("packages/dodex-standalone")) {
             (LEGACY_PID_FILE_NAME, LEGACY_UPDATE_PID_FILE_NAME)
         } else {
             (DAEMON_PID_FILE_NAME, DAEMON_UPDATE_PID_FILE_NAME)
@@ -477,6 +486,7 @@ impl Daemon {
                 self.wait_until_ready().await?,
             )
         };
+        client::verify_dodex_protocol(&self.socket_path).await?;
         if backend.is_some()
             && let Err(err) = managed.ensure_managed_updater(&settings).await
         {
@@ -523,6 +533,7 @@ impl Daemon {
         }
         let pid = managed.start_managed_backend(&settings).await?;
         let info = self.wait_until_ready().await?;
+        client::verify_dodex_protocol(&self.socket_path).await?;
         if let Err(err) = managed.ensure_managed_updater(&settings).await {
             eprintln!(
                 "warning: failed to ensure managed updater after app-server restart: {err:#}"
@@ -641,7 +652,7 @@ impl Daemon {
         }
         // All exits for busy, not-ready or superseded selections precede cleanup.
         // Keep the operation lock, and recheck readiness's selection under both locks.
-        if package_root.ends_with("app-server-daemon")
+        if package_root.ends_with("dodex-server-daemon")
             && let Ok(_install_lock) = install_lock::acquire_install_lock(package_root).await
             && let Ok(current_bin) = self.current_managed_codex_bin()
             && managed_install::resolved_managed_codex_bin(&current_bin)
@@ -902,6 +913,7 @@ impl Daemon {
         backend.start().await?;
         let info = self.wait_until_ready().await?;
         let auto_update_enabled = managed.ensure_managed_updater(&settings).await?;
+        client::verify_dodex_protocol(&self.socket_path).await?;
         #[cfg(unix)]
         // Older automatic updaters have no manual request socket to wait for.
         if auto_update_enabled
@@ -991,7 +1003,7 @@ impl Daemon {
 
     async fn ensure_managed_updater(&self, settings: &DaemonSettings) -> Result<bool> {
         let updater = backend::pid_update_loop_backend(self.backend_paths(settings));
-        if !settings.auto_update_enabled {
+        if !PUBLIC_RELEASE_UPDATES_ENABLED || !settings.auto_update_enabled {
             updater.stop().await?;
             return Ok(false);
         }
@@ -1278,6 +1290,30 @@ mod tests {
     #[cfg(unix)]
     use crate::settings::DaemonSettings;
 
+    #[tokio::test]
+    async fn dodex_never_starts_or_downloads_the_official_updater() {
+        let home = TempDir::new().unwrap();
+        let state = home.path().join(super::STATE_DIR_NAME);
+        let daemon = Daemon {
+            log_diagnostics: false,
+            socket_path: home.path().join("missing.sock"),
+            pid_file: state.join("daemon.pid"),
+            update_pid_file: state.join("daemon-updater.pid"),
+            operation_lock_file: state.join("daemon.lock"),
+            settings_file: state.join("settings.json"),
+            managed_codex_bin: super::managed_codex_bin(home.path()),
+        };
+        let settings = crate::settings::DaemonSettings { auto_update_enabled: true, ..Default::default() };
+        assert!(!daemon.ensure_managed_updater(&settings).await.unwrap());
+        let factory = || codex_http_client::HttpClientFactory::new(codex_http_client::OutboundProxyPolicy::ReqwestDefault);
+        let output = crate::update_loop::request_manual_update(&daemon, factory()).await.unwrap();
+        assert_eq!(output.status, super::UpdateStatus::Unsupported);
+        assert!(output.message.contains("update --from-cli"));
+        assert!(crate::update_loop::run(factory(), None).await.unwrap_err().to_string().contains("disabled"));
+        assert!(!home.path().join("packages").exists());
+        assert!(!daemon.update_pid_file.exists());
+    }
+
     #[test]
     fn remote_control_status_uses_camel_case_json() {
         assert_eq!(
@@ -1387,8 +1423,8 @@ mod tests {
     #[tokio::test]
     async fn waiting_lifecycle_command_uses_migrated_installation() {
         let home = TempDir::new().expect("home");
-        let state = home.path().join("app-server-daemon");
-        let legacy = home.path().join("packages/standalone/current");
+        let state = home.path().join("dodex-server-daemon");
+        let legacy = home.path().join("packages/dodex-standalone/current");
         std::fs::create_dir_all(&legacy).expect("legacy selection");
         let daemon = Daemon {
             log_diagnostics: false,
@@ -1407,7 +1443,7 @@ mod tests {
                 .await
                 .is_err()
         );
-        std::fs::create_dir_all(home.path().join("packages/app-server-daemon/current"))
+        std::fs::create_dir_all(home.path().join("packages/dodex-server-daemon/current"))
             .expect("migrate selection");
         drop(lock);
         let output = stop.await.expect("stop");
@@ -1446,7 +1482,7 @@ mod tests {
     #[tokio::test]
     async fn stop_and_fresh_start_discard_pending_thread_restore() {
         let home = TempDir::new().expect("home");
-        let state = home.path().join("app-server-daemon");
+        let state = home.path().join("dodex-server-daemon");
         codex_uds::prepare_private_socket_directory(&state)
             .await
             .expect("private state directory");
@@ -1490,7 +1526,7 @@ mod tests {
     #[tokio::test]
     async fn managed_local_backend_counts_as_bootstrapped_without_updater() {
         let home = TempDir::new().expect("home");
-        let standalone = home.path().join("packages/standalone");
+        let standalone = home.path().join("packages/dodex-standalone");
         let local_bin = standalone.join("local-main/bin/codex");
         tokio::fs::create_dir_all(local_bin.parent().expect("bin parent"))
             .await
@@ -1499,12 +1535,12 @@ mod tests {
             .expect("local bin");
         std::os::unix::fs::symlink("local-main", standalone.join("current"))
             .expect("current local build");
-        let state = home.path().join("app-server-daemon");
+        let state = home.path().join("dodex-server-daemon");
         let daemon = Daemon {
             log_diagnostics: false,
             socket_path: home
                 .path()
-                .join("app-server-control/app-server-control.sock"),
+                .join("dodex-server-control/app-server-control.sock"),
             pid_file: state.join("app-server.pid"),
             update_pid_file: state.join("app-server-updater.pid"),
             operation_lock_file: state.join("daemon.lock"),

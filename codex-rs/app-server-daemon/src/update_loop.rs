@@ -50,6 +50,11 @@ pub(crate) async fn request_manual_update(
     daemon: &Daemon,
     http_client_factory: HttpClientFactory,
 ) -> Result<crate::UpdateOutput> {
+    if !crate::PUBLIC_RELEASE_UPDATES_ENABLED {
+        let mut output = manual_update::unsupported(daemon).await?;
+        output.message = "Dodex does not install official Codex daemon updates. Use `codex app-server daemon update --from-cli` with the desired Dodex package.".to_string();
+        return Ok(output);
+    }
     if daemon
         .pid_file
         .file_name()
@@ -80,6 +85,10 @@ pub(crate) async fn run(
     http_client_factory: HttpClientFactory,
     restore_release: Option<String>,
 ) -> Result<()> {
+    anyhow::ensure!(
+        crate::PUBLIC_RELEASE_UPDATES_ENABLED,
+        "Official release updates are disabled for the Dodex daemon; use update --from-cli"
+    );
     let daemon = Daemon::from_environment()?;
     crate::backend::stderr_log::start(daemon.update_pid_file.with_extension("stderr.log"));
     let http = RouteAwareClientPool::new_without_request_logging(
@@ -382,7 +391,7 @@ async fn update_once(
             .any(|window| window == installer_guard.as_bytes()),
         "standalone installer does not support {installer_guard} guarded updates"
     );
-    if package_root.ends_with("app-server-daemon") {
+    if package_root.ends_with("dodex-server-daemon") {
         anyhow::ensure!(
             script
                 .windows(b"CODEX_INSTALL_DAEMON_ONLY".len())
@@ -610,7 +619,7 @@ async fn run_installer_script(
         .env("CODEX_INSTALL_DEFER_SELECTION", defer_selection)
         .env(
             "CODEX_INSTALL_DAEMON_ONLY",
-            if package_root.ends_with("app-server-daemon") {
+            if package_root.ends_with("dodex-server-daemon") {
                 "1"
             } else {
                 "0"

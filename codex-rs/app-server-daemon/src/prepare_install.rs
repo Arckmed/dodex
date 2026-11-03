@@ -74,7 +74,7 @@ pub async fn update_from_cli(
             .ok()
             .map(|info| info.app_server_version),
         managed_codex_path,
-        message: "The CLI package is selected and pinned. Run `codex app-server daemon update` to return to production updates.".to_string(),
+        message: "The Dodex CLI package is selected and pinned. Future replacements use `codex app-server daemon update --from-cli`.".to_string(),
     }))
 }
 
@@ -98,7 +98,7 @@ async fn prepare_from_package(
         .and_then(Path::parent)
         .context("daemon settings path has no Codex home")?;
     let previous_root = managed_install::package_root(home);
-    let root = home.join("packages/app-server-daemon");
+    let root = home.join("packages/dodex-server-daemon");
     anyhow::ensure!(
         daemon.managed_codex_bin.starts_with(&previous_root),
         "daemon package location changed; retry the command"
@@ -112,7 +112,7 @@ async fn prepare_from_package(
         }
         if !matches!(root.join("current").symlink_metadata(), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
             || ["daemon.pid", "daemon.stderr.log", "daemon-updater.pid", "daemon-updater.stderr.log"]
-                .iter().any(|name| !matches!(home.join("app-server-daemon").join(name).symlink_metadata(), Err(error) if error.kind() == std::io::ErrorKind::NotFound))
+                .iter().any(|name| !matches!(home.join("dodex-server-daemon").join(name).symlink_metadata(), Err(error) if error.kind() == std::io::ErrorKind::NotFound))
         {
             daemon.ensure_managed_codex_bin()?;
             return Ok(true);
@@ -146,7 +146,7 @@ async fn prepare_from_package(
         );
     }
     let source = source.context(
-        "this CLI has no complete local package; install a packaged Codex CLI or use the standalone installer",
+        "this Dodex CLI has no complete local package; run bin/codex from a complete Dodex package (see the README Compile section)",
     )?;
     anyhow::ensure!(
         !root.canonicalize()?.starts_with(source.canonicalize()?),
@@ -319,7 +319,7 @@ async fn prepare_from_package(
         std::fs::rename(stage.path(), &release)?;
     }
     let release = release.canonicalize()?;
-    let standalone = home.join("packages/standalone");
+    let standalone = home.join("packages/dodex-standalone");
     let canonical_source = source.canonicalize()?;
     let follows_latest = mode == InstallMode::Missing
         && stable

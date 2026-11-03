@@ -1,19 +1,36 @@
 use pretty_assertions::assert_eq;
 
 #[test]
+fn official_daemon_and_standalone_installations_are_never_selected() {
+    let home = tempfile::TempDir::new().expect("home");
+    for package in ["app-server-daemon", "standalone"] {
+        let bin = home.path().join("packages").join(package).join("current/bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(bin.join(super::managed_codex_file_name()), b"official").unwrap();
+    }
+    let state = home.path().join("app-server-daemon");
+    std::fs::create_dir(&state).unwrap();
+    for name in ["daemon.pid", "app-server.pid", "settings.json", "daemon.stderr.log"] {
+        std::fs::write(state.join(name), b"official state").unwrap();
+    }
+    assert_eq!(super::package_root(home.path()), home.path().join("packages/dodex-server-daemon"));
+    assert!(!super::managed_codex_bin(home.path()).exists());
+}
+
+#[test]
 fn discovers_package_and_legacy_installs() {
     let home = tempfile::TempDir::new().expect("home");
-    let current = home.path().join("packages/standalone/current");
+    let current = home.path().join("packages/dodex-standalone/current");
     let legacy = current.join(super::managed_codex_file_name());
     assert_eq!(
         super::managed_codex_bin(home.path()),
         home.path()
-            .join("packages/app-server-daemon/current/bin")
+            .join("packages/dodex-server-daemon/current/bin")
             .join(super::managed_codex_file_name())
     );
     std::fs::create_dir_all(&current).expect("current directory");
     std::fs::write(&legacy, b"legacy").expect("legacy executable");
-    let state = home.path().join("app-server-daemon");
+    let state = home.path().join("dodex-server-daemon");
     std::fs::create_dir(&state).unwrap();
     for name in ["settings.json", "daemon.lock", "app-server.pid.lock"] {
         std::fs::write(state.join(name), b"").unwrap();
@@ -21,7 +38,7 @@ fn discovers_package_and_legacy_installs() {
     // A CLI install and a previous stop/status operation do not establish ownership.
     assert_eq!(
         super::package_root(home.path()),
-        home.path().join("packages/app-server-daemon")
+        home.path().join("packages/dodex-server-daemon")
     );
     std::fs::write(state.join("app-server.stderr.log"), b"").unwrap();
     assert_eq!(super::managed_codex_bin(home.path()), legacy);
@@ -30,33 +47,33 @@ fn discovers_package_and_legacy_installs() {
     std::fs::write(&packaged, b"packaged").expect("packaged executable");
     assert_eq!(super::managed_codex_bin(home.path()), packaged);
 
-    std::fs::remove_dir_all(home.path().join("packages/standalone")).unwrap();
+    std::fs::remove_dir_all(home.path().join("packages/dodex-standalone")).unwrap();
     assert_eq!(
         super::package_root(home.path()),
-        home.path().join("packages/standalone")
+        home.path().join("packages/dodex-standalone")
     );
     std::fs::remove_file(state.join("app-server.stderr.log")).unwrap();
     std::fs::write(state.join("app-server.pid"), b"running daemon").unwrap();
     assert_eq!(
         super::package_root(home.path()),
-        home.path().join("packages/standalone")
+        home.path().join("packages/dodex-standalone")
     );
 
     std::fs::write(state.join("daemon.pid"), b"running dedicated daemon").unwrap();
     assert_eq!(
         super::package_root(home.path()),
-        home.path().join("packages/app-server-daemon")
+        home.path().join("packages/dodex-server-daemon")
     );
     std::fs::remove_file(state.join("daemon.pid")).unwrap();
     std::fs::write(state.join("daemon.stderr.log"), b"").unwrap();
     assert_eq!(
         super::package_root(home.path()),
-        home.path().join("packages/app-server-daemon")
+        home.path().join("packages/dodex-server-daemon")
     );
 
     #[cfg(unix)]
     {
-        let dedicated = home.path().join("packages/app-server-daemon");
+        let dedicated = home.path().join("packages/dodex-server-daemon");
         std::fs::write(&dedicated, b"not a directory").expect("unreadable selection");
         assert_eq!(super::package_root(home.path()), dedicated);
     }
@@ -66,10 +83,10 @@ fn discovers_package_and_legacy_installs() {
 #[test]
 fn updater_only_runs_for_stable_installer_owned_releases() {
     let home = tempfile::TempDir::new().expect("home");
-    let state = home.path().join("app-server-daemon");
+    let state = home.path().join("dodex-server-daemon");
     std::fs::create_dir(&state).unwrap();
     std::fs::write(state.join("app-server.stderr.log"), b"").unwrap();
-    let standalone = home.path().join("packages/standalone");
+    let standalone = home.path().join("packages/dodex-standalone");
     let current = standalone.join("current");
     let release = standalone.join("releases/0.150.0-aarch64-apple-darwin");
     let managed = release.join("bin/codex");

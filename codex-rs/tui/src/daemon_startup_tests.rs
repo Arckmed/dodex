@@ -76,6 +76,10 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
     for allow_embedded_fallback in [false, true] {
         for scenario in [
             "matching",
+            "no flags",
+            "official server",
+            "different protocol",
+            "malformed capabilities",
             "unreachable daemon",
             "conflicting client",
             "explicit enable",
@@ -94,7 +98,7 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                         "features.shell_tool=true",
                         "features.zz_missing=false",
                     ],
-                    "unreachable daemon" => Vec::new(),
+                    "unreachable daemon" | "no flags" | "official server" | "different protocol" | "malformed capabilities" => Vec::new(),
                     "explicit enable" => vec!["features.api_key_model_discovery=true"],
                     "mixed flags" => vec![
                         "features.zz_overridden=true",
@@ -133,7 +137,7 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                 },
                 allow_embedded_fallback,
             };
-            if cli_overrides.is_empty() {
+            if scenario == "unreachable daemon" {
                 drop(listener);
                 let result =
                     daemon_startup::compatibility_warning(&target, &config, &cli_overrides).await;
@@ -154,6 +158,18 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                     let response = match request.method.as_str() {
                         "initialize" => {
                             json!({"id": request.id, "result": {"userAgent": "daemon-test"}})
+                        }
+                        "dodex/capabilities" if scenario == "official server" => {
+                            json!({"id": request.id, "error": {"code": -32600, "message": "unknown variant `dodex/capabilities`"}})
+                        }
+                        "dodex/capabilities" if scenario == "different protocol" => {
+                            json!({"id": request.id, "result": {"protocolVersion": 999}})
+                        }
+                        "dodex/capabilities" if scenario == "malformed capabilities" => {
+                            json!({"id": request.id, "result": {}})
+                        }
+                        "dodex/capabilities" => {
+                            json!({"id": request.id, "result": {"protocolVersion": codex_app_server_protocol::DODEX_PROTOCOL_VERSION}})
                         }
                         "config/read" => {
                             json!({"id": request.id, "result": {"config": {}, "layers": [{
@@ -189,7 +205,7 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
             let result =
                 daemon_startup::compatibility_warning(&target, &config, &cli_overrides).await;
             server.await?;
-            if matches!(scenario, "matching" | "managed" | "legacy managed") {
+            if matches!(scenario, "matching" | "managed" | "legacy managed" | "no flags") {
                 assert_eq!(result?, None);
                 continue;
             }
@@ -200,9 +216,10 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                 }
                 "missing enabled" => "This session requires zz_missing to be enabled",
                 "unsupported RPC" => "Experimental feature request failed",
+                "official server" | "different protocol" | "malformed capabilities" => "the background server does not support this Dodex protocol; select a matching Dodex package with `codex app-server daemon update --from-cli`",
                 _ => unreachable!(),
             };
-            let restartable = scenario != "unsupported RPC";
+            let restartable = !matches!(scenario, "unsupported RPC" | "official server" | "different protocol" | "malformed capabilities");
             if allow_embedded_fallback && !restartable {
                 let warning = result?.expect("optional attachment should fall back");
                 assert_eq!(

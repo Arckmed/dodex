@@ -30,6 +30,23 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_util::sync::CancellationToken;
 
 #[test]
+fn dodex_discovery_and_recovery_do_not_use_official_daemon_paths() {
+    let home = tempfile::TempDir::new().unwrap();
+    assert_eq!(
+        app_server_control_socket_path(home.path()).unwrap().as_path(),
+        home.path().join("dodex-server-control/app-server-control.sock"),
+    );
+    assert_eq!(
+        super::app_server_startup_lock_path(home.path()).unwrap().as_path(),
+        home.path().join("dodex-server-control/app-server-startup.lock"),
+    );
+    assert_eq!(
+        super::daemon_recovery_file_path(home.path()),
+        home.path().join("dodex-server-daemon/loaded-threads.json"),
+    );
+}
+
+#[test]
 fn listen_unix_socket_parses_as_unix_socket_transport() {
     assert_eq!(
         AppServerTransport::from_listen_url("unix://"),

@@ -1413,6 +1413,11 @@ impl MessageProcessor {
             ClientRequest::ThreadGoalGet { params, .. } => {
                 self.thread_goal_processor.thread_goal_get(params).await
             }
+            ClientRequest::DodexCapabilities { .. } => Ok(Some(
+                codex_app_server_protocol::DodexCapabilitiesResponse {
+                    protocol_version: codex_app_server_protocol::DODEX_PROTOCOL_VERSION,
+                }.into(),
+            )),
             ClientRequest::ThreadCommentaryGet { params, .. } => self.thread_processor.thread_commentary_get(params).await.map(|response| Some(response.into())),
             ClientRequest::ThreadCommentarySet { params, .. } => self.thread_processor.thread_commentary_set(params).await.map(|response| Some(response.into())),
             ClientRequest::ThreadGoalClear { params, .. } => {

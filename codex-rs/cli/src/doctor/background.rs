@@ -17,7 +17,7 @@ use super::CheckStatus;
 use super::DoctorCheck;
 
 const MAX_PROBE_ERROR_CHARS: usize = 120;
-const STATE_DIR_NAME: &str = "app-server-daemon";
+const STATE_DIR_NAME: &str = "dodex-server-daemon";
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const PID_FILE_NAME: &str = "app-server.pid";
 const UPDATE_PID_FILE_NAME: &str = "app-server-updater.pid";
@@ -66,6 +66,7 @@ pub(super) async fn background_server_check(config: &Config) -> DoctorCheck {
         &state_dir.join("daemon-updater.pid"),
     );
     push_configured_updater(&mut details, &state_dir.join(SETTINGS_FILE_NAME));
+    details.push("Dodex update policy: official release downloads disabled; use daemon update --from-cli".to_string());
 
     let socket_path = match codex_app_server::app_server_control_socket_path(&config.codex_home) {
         Ok(socket_path) => socket_path,

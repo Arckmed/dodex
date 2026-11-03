@@ -18,16 +18,16 @@ use tokio::time::timeout;
 /// Preserve legacy launch state, including logs left after a daemon is stopped;
 /// settings, installer selections, and lock files alone do not prove a prior launch.
 pub(crate) fn package_root(codex_home: &Path) -> PathBuf {
-    let dedicated = codex_home.join("packages/app-server-daemon");
+    let dedicated = codex_home.join("packages/dodex-server-daemon");
     if !matches!(dedicated.join("current").symlink_metadata(),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound)
     {
         return dedicated;
     }
-    let state = codex_home.join("app-server-daemon");
+    let state = codex_home.join("dodex-server-daemon");
     for (package, artifacts) in [
         (
-            "app-server-daemon",
+            "dodex-server-daemon",
             [
                 crate::DAEMON_PID_FILE_NAME,
                 "daemon.stderr.log",
@@ -36,7 +36,7 @@ pub(crate) fn package_root(codex_home: &Path) -> PathBuf {
             ],
         ),
         (
-            "standalone",
+            "dodex-standalone",
             [
                 crate::LEGACY_PID_FILE_NAME,
                 "app-server.stderr.log",
@@ -62,7 +62,7 @@ pub(crate) fn managed_codex_bin(codex_home: &Path) -> PathBuf {
     let packaged = current.join("bin").join(managed_codex_file_name());
     let legacy = current.join(managed_codex_file_name());
     if packaged.is_file()
-        || !legacy.is_file() && (cfg!(windows) || root.ends_with("app-server-daemon"))
+        || !legacy.is_file() && (cfg!(windows) || root.ends_with("dodex-server-daemon"))
     {
         packaged
     } else {
@@ -86,7 +86,7 @@ pub(crate) fn is_stable_standalone_release(codex_home: &Path, codex_bin: &Path) 
         return false;
     };
     // GNU packages can seed the new directory; retain legacy updater eligibility.
-    if standalone.ends_with("standalone") && release_name.ends_with("-gnu") {
+    if standalone.ends_with("dodex-standalone") && release_name.ends_with("-gnu") {
         return false;
     }
     let targets = [

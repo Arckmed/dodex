@@ -661,13 +661,13 @@ enum AppServerDaemonSubcommand {
     /// Install durable local app-server management for SSH-driven use.
     Bootstrap(AppServerBootstrapCommand),
 
-    /// Start the local app server daemon if it is not already running.
+    /// Start the Dodex app server daemon if it is not already running.
     Start,
 
-    /// Restart the local app server daemon.
+    /// Restart the Dodex app server daemon.
     Restart,
 
-    /// Update the daemon package (may interrupt running work).
+    /// Replace the Dodex daemon using --from-cli (may interrupt running work).
     Update {
         /// Copy and pin this CLI package.
         #[arg(long)]

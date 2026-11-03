@@ -42,6 +42,48 @@ pub(crate) async fn probe(socket_path: &Path) -> Result<ProbeInfo> {
         })?
 }
 
+/// Check extension support without reading or changing any conversation.
+pub(crate) async fn verify_dodex_protocol(socket_path: &Path) -> Result<()> {
+    timeout(CONTROL_SOCKET_RESPONSE_TIMEOUT, async {
+        let mut websocket = connect(socket_path).await?;
+        initialize(&mut websocket, /*experimental_api*/ false).await?;
+        send_message(&mut websocket, &JSONRPCMessage::Notification(JSONRPCNotification {
+            method: "initialized".to_string(),
+            params: None,
+        })).await?;
+        let id = RequestId::String("dodex-capabilities".to_string());
+        send_message(&mut websocket, &JSONRPCMessage::Request(JSONRPCRequest {
+            id: id.clone(),
+            method: "dodex/capabilities".to_string(),
+            params: Some(serde_json::json!({})),
+            trace: None,
+        })).await?;
+        loop {
+            match read_message(&mut websocket).await? {
+                JSONRPCMessage::Response(response) if response.id == id => {
+                    let capabilities: codex_app_server_protocol::DodexCapabilitiesResponse =
+                        serde_json::from_value(response.result)?;
+                    anyhow::ensure!(
+                        capabilities.protocol_version == codex_app_server_protocol::DODEX_PROTOCOL_VERSION,
+                        "Dodex protocol version {} is incompatible with this client (requires {})",
+                        capabilities.protocol_version,
+                        codex_app_server_protocol::DODEX_PROTOCOL_VERSION,
+                    );
+                    let _ = websocket.close(None).await;
+                    return Ok(());
+                }
+                JSONRPCMessage::Error(error) if error.id == id => {
+                    return Err(anyhow!(
+                        "server does not support the required Dodex protocol: {}",
+                        error.error.message,
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }).await.context("timed out checking Dodex protocol support")?
+}
+
 async fn probe_inner(socket_path: &Path) -> Result<ProbeInfo> {
     let mut websocket = connect(socket_path).await?;
 
@@ -182,6 +224,10 @@ fn parse_version_from_user_agent(user_agent: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("app-server user-agent omitted version"))?;
     Ok(version.to_string())
 }
+
+#[cfg(test)]
+#[path = "client_dodex_tests.rs"]
+mod dodex_tests;
 
 #[cfg(all(test, unix))]
 mod tests {

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Append a model-invisible Commentary checkpoint to an active thread.",
+  "properties": {
+    "state": true,
+    "threadId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "state",
+    "threadId"
+  ],
+  "title": "ThreadCommentarySetParams",
+  "type": "object"
+}

@@ -1965,6 +1965,30 @@
           "type": "object"
         },
         {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
+                "dodex/capabilities"
+              ],
+              "title": "Dodex/capabilitiesRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/DodexCapabilitiesParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Dodex/capabilitiesRequest",
+          "type": "object"
+        },
+        {
           "description": "NEW APIs",
           "properties": {
             "id": {
@@ -2155,6 +2179,54 @@
             "params"
           ],
           "title": "Thread/goal/setRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
+                "thread/dodex/commentary/get"
+              ],
+              "title": "Thread/dodex/commentary/getRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ThreadCommentaryGetParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Thread/dodex/commentary/getRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
+                "thread/dodex/commentary/set"
+              ],
+              "title": "Thread/dodex/commentary/setRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ThreadCommentarySetParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Thread/dodex/commentary/setRequest",
           "type": "object"
         },
         {
@@ -6901,6 +6973,26 @@
         "life_sciences"
       ],
       "type": "string"
+    },
+    "DodexCapabilitiesParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DodexCapabilitiesParams",
+      "type": "object"
+    },
+    "DodexCapabilitiesResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "protocolVersion": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "protocolVersion"
+      ],
+      "title": "DodexCapabilitiesResponse",
+      "type": "object"
     },
     "DynamicToolCallOutputContentItem": {
       "oneOf": [
@@ -19978,6 +20070,49 @@
         "threadId"
       ],
       "title": "ThreadClosedNotification",
+      "type": "object"
+    },
+    "ThreadCommentaryGetParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Read a local Commentary checkpoint from the active thread's saved history.",
+      "properties": {
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "threadId"
+      ],
+      "title": "ThreadCommentaryGetParams",
+      "type": "object"
+    },
+    "ThreadCommentaryGetResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "state": true
+      },
+      "title": "ThreadCommentaryGetResponse",
+      "type": "object"
+    },
+    "ThreadCommentarySetParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Append a model-invisible Commentary checkpoint to an active thread.",
+      "properties": {
+        "state": true,
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "threadId"
+      ],
+      "title": "ThreadCommentarySetParams",
+      "type": "object"
+    },
+    "ThreadCommentarySetResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ThreadCommentarySetResponse",
       "type": "object"
     },
     "ThreadCompactStartParams": {

@@ -53,14 +53,16 @@ pub use websocket::start_websocket_acceptor;
 const INTERNAL_ERROR_CODE: i64 = -32603;
 const OVERLOADED_ERROR_CODE: i64 = -32001;
 
-const APP_SERVER_CONTROL_SOCKET_DIR_NAME: &str = "app-server-control";
+// Keep Dodex discovery and recovery independent of official Codex while sharing
+// CODEX_HOME for authentication, configuration, and conversation storage.
+const APP_SERVER_CONTROL_SOCKET_DIR_NAME: &str = "dodex-server-control";
 const APP_SERVER_CONTROL_SOCKET_FILE_NAME: &str = "app-server-control.sock";
 const APP_SERVER_STARTUP_LOCK_FILE_NAME: &str = "app-server-startup.lock";
 const DAEMON_RECOVERY_FILE_NAME: &str = "loaded-threads.json";
 
 pub fn daemon_recovery_file_path(codex_home: &Path) -> PathBuf {
     codex_home
-        .join("app-server-daemon")
+        .join("dodex-server-daemon")
         .join(DAEMON_RECOVERY_FILE_NAME)
 }
 

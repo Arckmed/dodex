@@ -158,6 +158,21 @@ pub(super) async fn compatibility_warning(
         let client = app_server_connection::connect(target)
             .await
             .map_err(|_| "could not connect to check daemon feature settings".to_string())?;
+        let capabilities = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            client.request_handle().request_typed::<codex_app_server_protocol::DodexCapabilitiesResponse>(
+                ClientRequest::DodexCapabilities {
+                    request_id: RequestId::String("tui-dodex-capabilities".to_string()),
+                    params: codex_app_server_protocol::DodexCapabilitiesParams {},
+                },
+            ),
+        ).await;
+        if !matches!(capabilities, Ok(Ok(ref response))
+            if response.protocol_version == codex_app_server_protocol::DODEX_PROTOCOL_VERSION)
+        {
+            let _ = client.shutdown().await;
+            return Err("the background server does not support this Dodex protocol; select a matching Dodex package with `codex app-server daemon update --from-cli`".to_string());
+        }
         if requested.is_empty() {
             let _ = client.shutdown().await;
             return Ok(());

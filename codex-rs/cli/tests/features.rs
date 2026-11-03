@@ -424,7 +424,7 @@ fn no_daemon_rejects_queue_and_explicit_remote_targets() -> Result<()> {
             .assert()
             .failure()
             .stderr(contains(expected));
-        assert!(!home.path().join("app-server-daemon").exists());
+        assert!(!home.path().join("dodex-server-daemon").exists());
     }
     Ok(())
 }

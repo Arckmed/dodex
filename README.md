@@ -14,6 +14,8 @@ Use PowerShell with Git, Python 3.13, Rustup, ripgrep (`rg`), and Visual Studio 
 
 Close any Dodex instance running from the build output before rebuilding that executable. Start in the repository root:
 
+On machines with limited RAM, add `-j 1` to the Cargo build command to run one build job at a time.
+
 ```powershell
 $env:CODEX_REPO_ROOT = (Get-Location).Path
 $v8Settings = python -c 'import sys,json; sys.path.insert(0,"scripts"); from codex_package.v8 import resolve_codex_v8_cargo_env; from codex_package.targets import TARGET_SPECS; print(json.dumps(resolve_codex_v8_cargo_env(TARGET_SPECS["x86_64-pc-windows-msvc"])))' | ConvertFrom-Json
@@ -52,6 +54,28 @@ dist/windows-x64/
 ```
 
 For another build, choose a new package directory or add `--force` to replace the previous package after closing processes that use it. `--no-daemon` selects an embedded app server when testing a build independently of an existing daemon. Voice and Windows Sandbox service installation require their separate runtime setup.
+
+## Dodex daemon
+
+Launching the packaged CLI normally starts or reuses a shared Dodex background server. Multiple terminals can use it from different projects. Official Codex uses its own daemon; Dodex does not replace or stop it. Login, configuration, and conversation history continue to use the existing `CODEX_HOME`.
+
+Dodex keeps daemon state under `$CODEX_HOME/dodex-server-daemon/`, its control socket under `$CODEX_HOME/dodex-server-control/`, and complete backend packages under `$CODEX_HOME/packages/dodex-server-daemon/`. Startup checks the Dodex extension protocol before restoring Commentary.
+
+Manage it with the packaged executable:
+
+```powershell
+.\dist\windows-x64\bin\codex.exe app-server daemon start
+.\dist\windows-x64\bin\codex.exe app-server daemon version
+.\dist\windows-x64\bin\codex.exe app-server daemon stop
+```
+
+After installing another Dodex build, select its backend with that build's executable:
+
+```powershell
+.\dist\windows-x64\bin\codex.exe app-server daemon update --from-cli
+```
+
+The replacement can restart a running Dodex daemon and interrupt connected terminals; the command asks for confirmation. Official Codex release downloads are disabled for the Dodex daemon, because those packages do not contain Dodex features. A newer frontend does not silently replace a running backend. `--no-daemon` remains available for an embedded server, and a shell wrapper that supplies it must omit it to use the daemon.
 
 ---
 
