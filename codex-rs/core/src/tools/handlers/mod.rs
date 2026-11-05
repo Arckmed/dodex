@@ -16,6 +16,7 @@ pub(crate) mod multi_agents_spec;
 pub(crate) mod multi_agents_v2;
 mod new_context_window;
 pub(crate) mod new_context_window_spec;
+pub(crate) mod outline;
 mod plan;
 pub(crate) mod plan_spec;
 mod request_permissions;

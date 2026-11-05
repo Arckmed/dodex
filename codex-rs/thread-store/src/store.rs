@@ -223,6 +223,26 @@ pub trait ThreadStore: Any + Send + Sync {
         })
     }
 
+    fn load_outline_revision(&self, params: LoadThreadHistoryParams, id: String, revision: String) -> ThreadStoreFuture<'_, Option<String>> {
+        Box::pin(async move {
+            let history = self.load_history(params).await?;
+            Ok(history.items.into_iter().rev().find_map(|item| match item {
+                RolloutItem::EventMsg(codex_protocol::protocol::EventMsg::DodexOutlineState(event)) => codex_protocol::outline::revision_from_checkpoint(&event.state,&id,&revision),
+                _ => None,
+            }))
+        })
+    }
+
+    fn load_outline_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
+        Box::pin(async move {
+            let history = self.load_history(params).await?;
+            Ok(history.items.into_iter().rev().find_map(|item| match item {
+                RolloutItem::EventMsg(codex_protocol::protocol::EventMsg::DodexOutlineState(event)) => Some(event.state),
+                _ => None,
+            }))
+        })
+    }
+
     /// Records metadata derived from rollout items.
     /// Unlike [`Self::update_thread_metadata`], this allows the write to be deferred.
     ///

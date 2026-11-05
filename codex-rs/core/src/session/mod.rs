@@ -2744,6 +2744,9 @@ impl Session {
         self.conversation.clear_active_handoff().await;
     }
 
+    /// Outline checkpoints were already flushed by their transaction; publish without a duplicate append.
+    pub(crate) async fn publish_outline_event(&self, event: Event) { let _ = self.tx_event.send(event).await; }
+
     pub(crate) async fn send_event_raw(&self, event: Event) {
         self.send_event_raw_with_persistence(event, /*persist*/ true)
             .await;

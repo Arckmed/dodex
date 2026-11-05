@@ -397,6 +397,7 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Outline => self.app_event_tx.send(AppEvent::OutlineCommand(String::new())),
             SlashCommand::Commentary => self.app_event_tx.send(AppEvent::CommentaryCommand { argument: String::new() }),
             SlashCommand::Comments => self.app_event_tx.send(AppEvent::OpenCommentaryOutbox),
             SlashCommand::Thoughts => self.app_event_tx.send(AppEvent::ToggleThoughts),
@@ -989,6 +990,7 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Outline => self.app_event_tx.send(AppEvent::OutlineCommand(trimmed.to_owned())),
             SlashCommand::Commentary => self.app_event_tx.send(AppEvent::CommentaryCommand { argument: trimmed.to_owned() }),
             SlashCommand::Goal if !trimmed.is_empty() => {
                 if !self.config.features.enabled(Feature::Goals) {
@@ -1342,6 +1344,7 @@ impl ChatWidget {
             | SlashCommand::Presets
             | SlashCommand::Plan
             | SlashCommand::Goal
+            | SlashCommand::Outline
             | SlashCommand::Commentary
             | SlashCommand::Comments
             | SlashCommand::Thoughts

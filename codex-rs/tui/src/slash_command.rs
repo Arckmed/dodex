@@ -44,6 +44,7 @@ pub enum SlashCommand {
     Plan,
     Voice,
     Goal,
+    Outline,
     Commentary,
     Thoughts,
     Comments,
@@ -144,6 +145,7 @@ impl SlashCommand {
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Voice => "start or stop voice; use /voice settings to choose a voice",
             SlashCommand::Goal => "set or view the goal for a long-running task",
+            SlashCommand::Outline => "canonical conversation reference; start, resume, view, edit, off, history, path, delete",
             SlashCommand::Commentary => "annotate assistant passages; on, off, add, browse, review, send",
             SlashCommand::Comments => "review pending passage annotations",
             SlashCommand::Thoughts => "toggle thought visibility for this conversation",
@@ -189,6 +191,7 @@ impl SlashCommand {
                 | SlashCommand::Fork
                 | SlashCommand::Plan
                 | SlashCommand::Goal
+                | SlashCommand::Outline
                 | SlashCommand::Commentary
                 | SlashCommand::Voice
                 | SlashCommand::Ide
@@ -300,7 +303,8 @@ impl SlashCommand {
             | SlashCommand::Stop
             | SlashCommand::App
             | SlashCommand::Goal
-            | SlashCommand::Commentary
+            | SlashCommand::Outline
+                | SlashCommand::Commentary
             | SlashCommand::Comments
             | SlashCommand::Thoughts
             | SlashCommand::Voice

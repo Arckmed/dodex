@@ -311,8 +311,22 @@ impl App {
 
     pub(super) async fn show_commentary_source(&mut self, server: &mut AppServerSession, thread_id: ThreadId, source: Source) {
         if self.current_displayed_thread_id() != Some(thread_id) { return; }
+        if !self.load_commentary_session(server, thread_id).await { return; }
         let Some(session) = self.commentary_sessions.get(&thread_id) else { return; };
         let automatic = session.state.enabled;
+        if let Some(reference) = source.roadmap.as_ref() {
+            match server.thread_outline(thread_id, serde_json::json!({"action":"revision","id":reference.roadmap_id,"revision":reference.revision})).await {
+                Ok(value) => {
+                    let text = value["text"].as_str().unwrap_or("").to_owned();
+                    let tx = self.app_event_tx.clone();
+                    let mut reader = CommentaryReader::new(source, text, &self.config.cwd, &self.keymap, automatic, Box::new(move |event| tx.send(AppEvent::CommentaryReader { thread_id, event })));
+                    reader.set_passages(self.commentary_passages());
+                    self.chat_widget.show_bottom_pane_view(Box::new(reader));
+                }
+                Err(error) => self.chat_widget.add_error_message(format!("Could not open Outline revision: {error}")),
+            }
+            return;
+        }
         let Some(turn_id) = source.turn_id.as_deref() else { self.chat_widget.add_error_message("This source does not identify an assistant turn.".into()); return; };
         let item = match server.thread_commentary_source(thread_id, turn_id, &source.entry_id).await {
             Ok(Some(item)) => item,
@@ -330,6 +344,7 @@ impl App {
     pub(super) async fn handle_commentary_reader(&mut self, server: &mut AppServerSession, thread_id: ThreadId, event: ReaderEvent) {
         if self.current_displayed_thread_id() != Some(thread_id) { return; }
         match event {
+            ReaderEvent::Edit { source } => { if let Some(doc) = source.roadmap { self.app_event_tx.send(AppEvent::OutlineCommand(format!("edit {}",doc.roadmap_id))); } },
             ReaderEvent::Close => { if self.commentary_sessions.get(&thread_id).is_some_and(|session| session.return_to_outbox) { self.open_commentary_outbox(server).await; } }
             ReaderEvent::Quote { source, quotation } => {
                 let Some(session) = self.commentary_sessions.get_mut(&thread_id) else { return; };
@@ -370,7 +385,7 @@ impl App {
         self.open_commentary_outbox(server).await;
     }
 
-    async fn load_commentary_session(&mut self, server: &mut AppServerSession, thread_id: ThreadId) -> bool {
+    pub(super) async fn load_commentary_session(&mut self, server: &mut AppServerSession, thread_id: ThreadId) -> bool {
         if !self.commentary_sessions.contains_key(&thread_id) {
             let state = match server.thread_commentary_get(thread_id).await {
                 Ok(None) => Commentary::default(),

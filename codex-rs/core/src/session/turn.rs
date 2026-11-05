@@ -1857,6 +1857,22 @@ async fn run_sampling_request(
             base_instructions.clone(),
             incremental_tools,
         );
+        if let Some(reference) = sess.outline_reference(&prompt.input.iter().rev().find_map(|item| match item { ResponseItem::Message { role, content, .. } if role == "user" => Some(content.iter().filter_map(|item| match item { ContentItem::InputText { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>().join("\n")), _ => None }).unwrap_or_default()).await
+            .map_err(|e| CodexErr::Fatal(format!("Could not prepare Outline reference: {e}")))? {
+            // Keep host maintenance guidance separate from document data, as in the Pi extension.
+            // A stable prefix preserves incremental continuation when the reference is unchanged.
+            let outline_message = |role: &str, text: String| ResponseItem::Message {
+                id: None,
+                role: role.into(),
+                content: vec![codex_protocol::models::input_text(text)],
+                encrypted_content: None,
+                status: None,
+                phase: None,
+                internal_chat_message_metadata_passthrough: None,
+            };
+            prompt.input.insert(0, outline_message("user", reference));
+            prompt.input.insert(0, outline_message("developer", codex_protocol::outline::GUIDANCE.into()));
+        }
         let responses_metadata = sess
             .responses_metadata(step_context.as_ref(), CodexResponsesRequestKind::Turn)
             .await;
@@ -2061,6 +2077,7 @@ pub(crate) async fn built_tools(
             .instrument(trace_span!("built_tools.load_discoverable_tools"))
             .await
         };
+    if let Err(error) = sess.outline_request(serde_json::json!({"action":"get"})).await { sess.outline_warning(error).await; }
     Ok(Arc::new(build_tool_router(
         sess,
         turn_context,
@@ -2369,6 +2386,7 @@ pub(super) fn realtime_text_for_event(msg: &EventMsg) -> Option<RealtimeEventTex
         | EventMsg::RawResponseItem(_)
         | EventMsg::PrivateSessionEvent(_)
         | EventMsg::DodexCommentaryState(_)
+        | EventMsg::DodexOutlineState(_)
         | EventMsg::RawResponseCompleted(_)
         | EventMsg::ItemStarted(_)
         | EventMsg::HookStarted(_)

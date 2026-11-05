@@ -6547,6 +6547,7 @@ async fn make_test_app() -> Box<App> {
 
     Box::new(App {
         feature_write_lock: Arc::default(),
+            outline: Default::default(),
             commentary_sessions: Default::default(),
             commentary_active_thread: None,
             commentary_load_id: None,
@@ -6677,6 +6678,7 @@ pub(super) async fn make_test_app_with_channels() -> (
     (
         Box::new(App {
             feature_write_lock: Arc::default(),
+            outline: Default::default(),
             commentary_sessions: Default::default(),
             commentary_active_thread: None,
             commentary_load_id: None,

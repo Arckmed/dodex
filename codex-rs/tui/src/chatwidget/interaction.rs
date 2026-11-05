@@ -403,6 +403,10 @@ impl ChatWidget {
         self.request_redraw();
     }
 
+    pub(crate) fn update_outline_reader(&mut self, source: &crate::dodex_features::commentary::Source, text: &str) {
+        self.bottom_pane.update_outline(source, text);
+    }
+
     pub(crate) fn show_bottom_pane_view(&mut self, view: Box<dyn BottomPaneView>) {
         self.bottom_pane.show_view(view);
         self.request_redraw();

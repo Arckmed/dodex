@@ -168,6 +168,10 @@ impl App {
         app_server_client: &AppServerSession,
         mut notification: ServerNotification,
     ) {
+        if let ServerNotification::ThreadOutlineUpdated(update) = &notification {
+            if let Ok(thread_id) = ThreadId::from_string(&update.thread_id) { self.refresh_outline(app_server_client, thread_id); }
+            return;
+        }
         if let ServerNotification::TurnModerationMetadata(metadata) = &mut notification
             && (!super::safety_recourse::supports_server(app_server_client)
                 || self

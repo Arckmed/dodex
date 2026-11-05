@@ -160,7 +160,7 @@ pub(crate) fn batch_text(comments: &[Comment], id: &str, final_consideration: Op
     ];
     for (index, comment) in comments.iter().enumerate() {
         let heading = match &comment.source.roadmap {
-            Some(roadmap) => format!("### {}. Roadmap {} · revision {}\nPath: {}\nThis quotation refers to that saved revision; compare the current roadmap before applying changes.", index + 1, serde_json::to_string(&roadmap.title).expect("a string serializes"), roadmap.revision, roadmap.path),
+            Some(roadmap) => format!("### {}. Outline {} · revision {}\nPath: {}\nThis quotation refers to that saved revision; compare the current Outline before applying changes.", index + 1, serde_json::to_string(&roadmap.title).expect("a string serializes"), roadmap.revision, roadmap.path),
             None => format!("### {}. Assistant message {} · {}", index + 1, comment.source.entry_id, comment.source.timestamp.as_deref().unwrap_or("timestamp unavailable")),
         };
         let quotation = comment.quotation.split('\n').map(|line| format!("> {line}")).collect::<Vec<_>>().join("\n");
@@ -201,8 +201,8 @@ mod tests {
         let mut item = comment("one");
         item.source.roadmap = Some(RoadmapSource { owner_id: "thread".into(), roadmap_id: "roadmap".into(), title: "A \"quoted\" title".into(), path: "roadmap.md".into(), revision: "abc123".into() });
         let text = batch_text(&[item], "id", None);
-        assert!(text.contains("Roadmap \"A \\\"quoted\\\" title\" · revision abc123"));
-        assert!(text.contains("compare the current roadmap before applying changes"));
+        assert!(text.contains("Outline \"A \\\"quoted\\\" title\" · revision abc123"));
+        assert!(text.contains("compare the current Outline before applying changes"));
     }
 
     #[test]

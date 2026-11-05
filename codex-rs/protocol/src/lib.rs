@@ -46,6 +46,7 @@ pub mod parse_command;
 mod permission_profile_intersection;
 mod permission_profile_snapshot;
 pub mod permissions;
+pub mod outline;
 pub mod plan_tool;
 pub mod protocol;
 pub mod realtime;

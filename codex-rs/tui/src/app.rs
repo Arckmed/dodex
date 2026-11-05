@@ -278,6 +278,7 @@ mod thread_event_buffer;
 mod thread_events;
 mod thread_goal_actions;
 mod commentary;
+mod outline;
 mod thread_routing;
 mod thread_session_state;
 mod thread_settings;
@@ -537,6 +538,7 @@ struct InitialHistoryReplayBuffer {
 
 pub(crate) struct App {
     commentary_sessions: HashMap<ThreadId, commentary::CommentarySession>,
+    outline: crate::dodex_features::outline::OutlineUi,
     commentary_active_thread: Option<ThreadId>,
     commentary_load_id: Option<uuid::Uuid>,
     feature_write_lock: Arc<tokio::sync::Mutex<()>>,
@@ -874,6 +876,7 @@ impl App {
         event: TuiEvent,
     ) -> Result<AppRunControl> {
         self.sync_commentary_thread(app_server).await;
+        self.sync_outline_thread();
         let displayed_thread = self.current_displayed_thread_id();
         self.chat_widget.sync_conversation_view(displayed_thread);
         self.transcript_view

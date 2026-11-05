@@ -1757,6 +1757,14 @@ impl AppServerSession {
             .wrap_err("thread/goal/get failed in TUI")
     }
 
+    pub(crate) async fn thread_outline(&mut self, thread_id: ThreadId, request: serde_json::Value) -> Result<serde_json::Value> {
+        let request_id = self.next_request_id();
+        let response: codex_app_server_protocol::ThreadOutlineResponse = self.request_handle.request_typed(ClientRequest::ThreadOutline {
+            request_id, params: codex_app_server_protocol::ThreadOutlineParams { thread_id: thread_id.to_string(), request },
+        }).await.wrap_err("Outline operation failed")?;
+        Ok(response.result)
+    }
+
     pub(crate) async fn thread_commentary_get(&mut self, thread_id: ThreadId) -> Result<Option<serde_json::Value>> {
         let request_id = self.next_request_id();
         let response: codex_app_server_protocol::ThreadCommentaryGetResponse = self.request_handle.request_typed(ClientRequest::ThreadCommentaryGet {

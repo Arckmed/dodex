@@ -11,10 +11,12 @@ use crate::transcript_view::TranscriptView;
 use super::commentary::Source;
 
 #[derive(Clone, Debug)]
-pub(crate) enum ReaderEvent { Close, Quote { source: Source, quotation: String } }
+pub(crate) enum ReaderEvent { Close, Edit { source: Source }, Quote { source: Source, quotation: String } }
 
 pub(crate) struct CommentaryReader {
     source: Source,
+    cwd: std::path::PathBuf,
+    live_outline: bool,
     cells: Vec<Arc<dyn HistoryCell>>,
     view: RefCell<TranscriptView>,
     automatic: bool,
@@ -29,6 +31,7 @@ pub(crate) struct CommentaryReader {
 }
 
 impl CommentaryReader {
+    pub(crate) fn enable_live_outline(&mut self) { self.live_outline = true; }
     pub(crate) fn set_passages(&mut self, passages: Vec<super::commentary_highlights::Passage>) { self.view.borrow_mut().set_commentary_passages(passages); }
     pub(crate) fn new(source: Source, text: String, cwd: &std::path::Path, keymap: &RuntimeKeymap, automatic: bool, notify: Box<dyn FnMut(ReaderEvent)>) -> Self {
         let mut quote_editor = TextArea::new();
@@ -42,10 +45,10 @@ impl CommentaryReader {
         view.copy_on_select = false;
         view.primary_selection = false;
         view.jump_to_beginning(&cells);
-        Self { source, cells, view: RefCell::new(view), automatic, content_area: Cell::new(Rect::default()), selecting: false, quote_editor, quote_editor_state: RefCell::new(TextAreaState::default()), editing_quote: false, complete: false, notice: None, notify }
+        Self { source, cwd: cwd.into(), live_outline: false, cells, view: RefCell::new(view), automatic, content_area: Cell::new(Rect::default()), selecting: false, quote_editor, quote_editor_state: RefCell::new(TextAreaState::default()), editing_quote: false, complete: false, notice: None, notify }
     }
     fn accept_selection(&mut self) {
-        let selection = self.view.borrow_mut().selected_assistant();
+        let selection = self.view.borrow_mut().selected_document();
         match selection {
             Ok(selection) => {
                 let mut source = self.source.clone();
@@ -60,6 +63,15 @@ impl CommentaryReader {
 }
 
 impl BottomPaneView for CommentaryReader {
+    fn update_outline(&mut self, source: &Source, text: &str) {
+        if !self.live_outline || self.source.entry_id == source.entry_id || self.selecting || self.editing_quote || self.view.borrow().has_active_interaction() { return; }
+        if self.source.roadmap.as_ref().map(|r| &r.roadmap_id) != source.roadmap.as_ref().map(|r| &r.roadmap_id) { return; }
+        let cell: Arc<dyn HistoryCell> = Arc::new(AgentMarkdownCell::new_with_inline_visualizations(text.into(), &self.cwd, None).with_source_item_id(Some(source.entry_id.clone())).with_source_turn_id(source.turn_id.clone()));
+        self.view.borrow_mut().release_live_reading();
+        self.view.borrow_mut().replace_range(&self.cells, 0..self.cells.len(), &cell);
+        self.cells = vec![cell]; self.source = source.clone(); self.quote_editor.set_text_clearing_elements(text);
+    }
+
     fn presentation(&self) -> ViewPresentation { ViewPresentation::Centered }
     fn centered_area(&self, viewport: Rect) -> Option<Rect> {
         let width = ((u32::from(viewport.width) * 80 / 100) as u16).min(viewport.width.saturating_sub(2));
@@ -83,7 +95,8 @@ impl BottomPaneView for CommentaryReader {
             else { self.quote_editor.input(key); }
             return;
         }
-        if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::ALT { self.accept_selection(); }
+        if key.code == KeyCode::Char('e') && key.modifiers.is_empty() && self.source.roadmap.is_some() { self.complete = true; (self.notify)(ReaderEvent::Edit { source: self.source.clone() }); }
+        else if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::ALT { self.accept_selection(); }
         else if key.code == KeyCode::Char('q') && key.modifiers.is_empty() { self.editing_quote = true; self.selecting = false; self.notice = None; }
         else { self.view.borrow_mut().handle_key(key, &self.cells); }
     }
@@ -96,7 +109,7 @@ impl BottomPaneView for CommentaryReader {
         if event.kind == MouseEventKind::Down(MouseButton::Left) { self.selecting = self.content_area.get().contains((event.column, event.row).into()); }
         self.view.borrow_mut().handle_mouse(event, &self.cells);
         let released = event.kind == MouseEventKind::Up(MouseButton::Left);
-        let selected = self.automatic && released && self.selecting && self.view.borrow_mut().selected_assistant().is_ok();
+        let selected = self.automatic && released && self.selecting && self.view.borrow_mut().selected_document().is_ok();
         if released { self.selecting = false; }
         if selected { self.accept_selection(); }
         true
@@ -159,14 +172,14 @@ mod tests {
 impl Renderable for CommentaryReader {
     fn desired_height(&self, _width: u16) -> u16 { 24 }
     fn render(&self, area: Rect, buffer: &mut Buffer) {
-        Block::default().borders(Borders::ALL).title(if self.editing_quote { " Choose quotation (trim this text to the passage you want) ".to_owned() } else { format!(" Assistant message {} ", self.source.entry_id) }).render(area, buffer);
+        Block::default().borders(Borders::ALL).title(if self.editing_quote { " Choose quotation (trim this text to the passage you want) ".to_owned() } else { self.source.roadmap.as_ref().map(|r| format!(" Outline {} - {} ",r.title,r.revision.chars().take(8).collect::<String>())).unwrap_or_else(|| format!(" Assistant message {} ", self.source.entry_id)) }).render(area, buffer);
         let inner = area.inner(ratatui::layout::Margin::new(1, 1));
         if inner.is_empty() { self.content_area.set(Rect::default()); return; }
         let content = Rect { height: inner.height.saturating_sub(1), ..inner };
         self.content_area.set(content);
         if self.editing_quote { StatefulWidgetRef::render_ref(&(&self.quote_editor), content, buffer, &mut self.quote_editor_state.borrow_mut()); }
         else { self.view.borrow_mut().render(content, buffer, &self.cells); }
-        Paragraph::new(self.notice.as_deref().unwrap_or(if self.editing_quote { "Enter accept quotation · Shift+Enter newline · Esc cancel" } else { "Select then Alt+C · Q choose/trim quotation · scroll to read · Esc close" })).render(Rect::new(inner.x, inner.bottom() - 1, inner.width, 1), buffer);
+        Paragraph::new(self.notice.as_deref().unwrap_or(if self.editing_quote { "Enter accept quotation · Shift+Enter newline · Esc cancel" } else { if self.source.roadmap.is_some() { "Alt+R expand - E edit (expanded) - select/Alt+C or Q quote - wheel scroll - Esc close" } else { "Select then Alt+C · Q choose/trim quotation · scroll to read · Esc close" } })).render(Rect::new(inner.x, inner.bottom() - 1, inner.width, 1), buffer);
     }
     fn cursor_pos(&self, area: Rect) -> Option<(u16,u16)> {
         if !self.editing_quote { return None; }

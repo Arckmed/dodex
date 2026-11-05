@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Conversation-owned Outline operations. Mutations require a generation or content revision.",
+  "properties": {
+    "request": true,
+    "threadId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "request",
+    "threadId"
+  ],
+  "title": "ThreadOutlineParams",
+  "type": "object"
+}

@@ -135,7 +135,7 @@ impl Renderable for CommentaryOutbox {
         if let Some(comment) = self.state.comments.get(self.selected) {
             lines.push(Line::default());
             *self.source_area.borrow_mut() = Rect::new(inner.x, inner.y + lines.len() as u16, inner.width, 1);
-            lines.push(Line::from(match &comment.source.roadmap { Some(source) => format!("Roadmap {} · {} · V to view", summary(&source.title), source.revision), None => format!("Source {} · click here / V to view", comment.source.entry_id) }).cyan());
+            lines.push(Line::from(match &comment.source.roadmap { Some(source) => format!("Outline {} · {} · V to view", summary(&source.title), source.revision), None => format!("Source {} · click here / V to view", comment.source.entry_id) }).cyan());
             lines.extend(comment.note.lines().take(3).map(|line| Line::from(line.to_owned())));
         }
         Paragraph::new(lines).render(Rect { height: inner.height.saturating_sub(1), ..inner }, buffer);

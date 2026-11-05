@@ -2,6 +2,7 @@
 
 pub(crate) mod commentary;
 pub(crate) mod conversation;
+pub(crate) mod outline;
 pub(crate) mod commentary_editor;
 pub(crate) mod commentary_source;
 pub(crate) mod commentary_colors;

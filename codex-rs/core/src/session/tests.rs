@@ -7142,6 +7142,7 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
     };
 
     let session = Session {
+        outline: Default::default(),
         thread_id,
         installation_id: "11111111-1111-4111-8111-111111111111".to_string(),
         tx_event,
@@ -9465,6 +9466,7 @@ where
     };
 
     let session = Arc::new(Session {
+        outline: Default::default(),
         thread_id,
         installation_id: "11111111-1111-4111-8111-111111111111".to_string(),
         tx_event,

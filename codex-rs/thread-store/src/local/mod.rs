@@ -617,6 +617,14 @@ impl ThreadStore for LocalThreadStore {
         Box::pin(async move { model_context::load_latest_model_context(self, params).await })
     }
 
+    fn load_outline_revision(&self, params: LoadThreadHistoryParams, id: String, revision: String) -> ThreadStoreFuture<'_, Option<String>> {
+        Box::pin(commentary::load_outline_revision(self, params, id, revision))
+    }
+
+    fn load_outline_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
+        Box::pin(commentary::load_outline(self, params))
+    }
+
     fn load_commentary_state(&self, params: LoadThreadHistoryParams) -> ThreadStoreFuture<'_, Option<serde_json::Value>> {
         Box::pin(async move { commentary::load(self, params).await })
     }

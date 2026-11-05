@@ -6,6 +6,16 @@ use crate::{LoadThreadHistoryParams, ThreadStoreError, ThreadStoreResult};
 use super::{LocalThreadStore, thread_rollout_resolver};
 
 pub(super) async fn load(store: &LocalThreadStore, params: LoadThreadHistoryParams) -> ThreadStoreResult<Option<serde_json::Value>> {
+    load_checkpoint(store, params, false, None).await
+}
+
+pub(super) async fn load_outline(store: &LocalThreadStore, params: LoadThreadHistoryParams) -> ThreadStoreResult<Option<serde_json::Value>> { load_checkpoint(store, params, true, None).await }
+
+pub(super) async fn load_outline_revision(store: &LocalThreadStore, params: LoadThreadHistoryParams, id: String, revision: String) -> ThreadStoreResult<Option<String>> {
+    Ok(load_checkpoint(store, params, true, Some((id, revision))).await?.and_then(|v|v.as_str().map(str::to_owned)))
+}
+
+async fn load_checkpoint(store: &LocalThreadStore, params: LoadThreadHistoryParams, outline: bool, revision: Option<(String,String)>) -> ThreadStoreResult<Option<serde_json::Value>> {
     let resolved = if params.include_archived {
         thread_rollout_resolver::resolve_current_including_archived(store, params.thread_id).await?
     } else {
@@ -15,7 +25,7 @@ pub(super) async fn load(store: &LocalThreadStore, params: LoadThreadHistoryPara
     let meta = codex_rollout::read_session_meta_line(&resolved.path).await.map_err(|error| ThreadStoreError::Internal { message: format!("failed to read Commentary session metadata: {error}") })?;
     if meta.meta.history_mode != ThreadHistoryMode::Paginated {
         let history = store.load_history(params).await?;
-        return Ok(history.items.into_iter().rev().find_map(checkpoint));
+        return Ok(history.items.into_iter().rev().find_map(|item| checkpoint(item, outline, revision.as_ref())));
     }
     let lineage = store.resolve_rollout_lineage_for_history_page(params.thread_id).await?;
     let (stop, keep_running) = tokio::sync::oneshot::channel::<()>();
@@ -32,7 +42,7 @@ pub(super) async fn load(store: &LocalThreadStore, params: LoadThreadHistoryPara
                 let ordinal = line.ordinal.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "paginated Commentary history has a record without an ordinal"))?;
                 if ordinal < segment.start_ordinal() { break; }
                 if segment.end_ordinal().is_some_and(|end| ordinal >= end) { continue; }
-                if let Some(state) = checkpoint(line.item) { return Ok(Some(state)); }
+                if let Some(state) = checkpoint(line.item, outline, revision.as_ref()) { return Ok(Some(state)); }
             }
         }
         Ok(None)
@@ -41,9 +51,13 @@ pub(super) async fn load(store: &LocalThreadStore, params: LoadThreadHistoryPara
     result.map_err(|error| ThreadStoreError::Internal { message: format!("failed to read Commentary history: {error}") })
 }
 
-fn checkpoint(item: RolloutItem) -> Option<serde_json::Value> {
+fn checkpoint(item: RolloutItem, outline: bool, revision: Option<&(String,String)>) -> Option<serde_json::Value> {
     match item {
-        RolloutItem::EventMsg(EventMsg::DodexCommentaryState(event)) => Some(event.state),
+        RolloutItem::EventMsg(EventMsg::DodexCommentaryState(event)) if !outline => Some(event.state),
+        RolloutItem::EventMsg(EventMsg::DodexOutlineState(event)) if outline => match revision {
+            Some((id,hash)) => codex_protocol::outline::revision_from_checkpoint(&event.state,id,hash).map(serde_json::Value::String),
+            None => Some(event.state),
+        },
         _ => None,
     }
 }

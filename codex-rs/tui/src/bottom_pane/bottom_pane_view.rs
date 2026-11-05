@@ -40,6 +40,9 @@ pub(crate) trait BottomPaneView: Renderable {
         None
     }
 
+    /// Refresh a live Outline reader. Historical Commentary readers keep their saved revision.
+    fn update_outline(&mut self, _source: &crate::dodex_features::commentary::Source, _text: &str) {}
+
     /// Refresh an open configuration panel, including one below a child editor.
     /// Returns whether this view contains a configuration panel.
     fn update_config_panel(&mut self, _update: &crate::config_panel::ConfigPanelUpdate) -> bool {

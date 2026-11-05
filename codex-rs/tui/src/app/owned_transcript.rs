@@ -459,6 +459,8 @@ impl App {
         let animating =
             view.is_following() && active_key.is_some_and(|key| key.animation_tick.is_some());
         let loading = view.is_loading_history() && motion == MotionMode::Animated;
+        drop(bottom);
+        self.paint_outline(frame);
         PaintedConversation {
             image_range: first_image..frame.image_placements.len(),
             bottom_area,
@@ -552,6 +554,12 @@ impl App {
         event: &TuiEvent,
     ) -> Result<bool> {
         let has_modal = self.chat_widget.has_active_modal();
+        if !has_modal && self.overlay.is_none() {
+            if matches!(event, TuiEvent::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('r') && key.modifiers == KeyModifiers::ALT) {
+                self.app_event_tx.send(AppEvent::OutlineCommand("view".into())); return Ok(true);
+            }
+            if let TuiEvent::Mouse(mouse) = event { if self.outline_mouse(*mouse) { tui.frame_requester().schedule_frame(); return Ok(true); } }
+        }
         if tui.is_owned_screen() && !has_modal && self.overlay.is_none()
             && matches!(event, TuiEvent::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('m') && key.modifiers == KeyModifiers::ALT)
         {

@@ -149,6 +149,12 @@ pub(crate) fn build_tool_router(
     };
     let mut registry = ToolRegistry::with_tool_policy(Arc::clone(&session.tool_policy));
     add_core_tool_sources(&context, &mut registry);
+    if session.outline.enabled.load(std::sync::atomic::Ordering::Acquire) {
+        if let Some(id) = session.outline.active_id.read().ok().and_then(|id| id.clone()) {
+            registry.add(crate::tools::handlers::outline::OutlineHandler { write: false, document_id: id.clone() });
+            registry.add(crate::tools::handlers::outline::OutlineHandler { write: true, document_id: id });
+        }
+    }
 
     let registered_mcp_tools = session.services.mcp_handler_cache.append_mcp_tools(
         mcp,

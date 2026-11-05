@@ -2188,6 +2188,30 @@
             },
             "method": {
               "enum": [
+                "thread/dodex/outline"
+              ],
+              "title": "Thread/dodex/outlineRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ThreadOutlineParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Thread/dodex/outlineRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
                 "thread/dodex/commentary/get"
               ],
               "title": "Thread/dodex/commentary/getRequestMethod",
@@ -17302,6 +17326,26 @@
           "properties": {
             "method": {
               "enum": [
+                "thread/dodex/outline/updated"
+              ],
+              "title": "Thread/dodex/outline/updatedNotificationMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ThreadOutlineUpdatedNotification"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "title": "Thread/dodex/outline/updatedNotification",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "enum": [
                 "thread/goal/updated"
               ],
               "title": "Thread/goal/updatedNotificationMethod",
@@ -22028,6 +22072,52 @@
         "threadId"
       ],
       "title": "ThreadNameUpdatedNotification",
+      "type": "object"
+    },
+    "ThreadOutlineParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Conversation-owned Outline operations. Mutations require a generation or content revision.",
+      "properties": {
+        "request": true,
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "threadId"
+      ],
+      "title": "ThreadOutlineParams",
+      "type": "object"
+    },
+    "ThreadOutlineResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "result": true
+      },
+      "required": [
+        "result"
+      ],
+      "title": "ThreadOutlineResponse",
+      "type": "object"
+    },
+    "ThreadOutlineUpdatedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "generation",
+        "threadId"
+      ],
+      "title": "ThreadOutlineUpdatedNotification",
       "type": "object"
     },
     "ThreadPredictionResult": {

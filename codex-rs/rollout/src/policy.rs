@@ -134,6 +134,7 @@ fn persisted_event_msg(
         EventMsg::TokenCount(_)
         | EventMsg::ThreadGoalUpdated(_)
         | EventMsg::DodexCommentaryState(_)
+        | EventMsg::DodexOutlineState(_)
         | EventMsg::ThreadRolledBack(_)
         | EventMsg::TurnAborted(_)
         | EventMsg::TurnStarted(_)

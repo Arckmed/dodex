@@ -33,6 +33,13 @@ pub(crate) struct AssistantSelection {
     pub(crate) quotation: String,
 }
 
+/// Display coordinates and text for a document whose persistent identity is owned by its reader.
+pub(crate) struct DocumentSelection {
+    pub(crate) display_range: std::ops::Range<usize>,
+    pub(crate) display_row: usize,
+    pub(crate) quotation: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AssistantSelectionError {
     NoSelection,
@@ -372,6 +379,30 @@ impl TranscriptView {
         if quotation.encode_utf16().count() > 50_000 { return Err(Error::TooLarge); }
         let display_row = layout.row_for_offset(start);
         Ok(AssistantSelection { cell, source_item_id, source_turn_id, display_range: start..end, display_row, quotation })
+    }
+
+    /// Document readers supply their own document/revision identity; they do not invent a turn ID.
+    pub(crate) fn selected_document(&mut self) -> Result<DocumentSelection, AssistantSelectionError> {
+        use AssistantSelectionError as Error;
+        let selection = self.selection.as_ref().ok_or(Error::NoSelection)?;
+        if selection.start.key != selection.end.key || selection.start.key == EntryKey::Live {
+            return Err(Error::NotSingleAssistantMessage);
+        }
+        let cells = Arc::clone(&selection.snapshot.cells);
+        let index = self.resolve(&cells, selection.start);
+        let cell = Arc::clone(cells.get(index).ok_or(Error::SourceUnavailable)?);
+        if EntryKey::cell(&cell) != selection.start.key { return Err(Error::SourceUnavailable); }
+        if !cell.as_any().is::<crate::history_cell::AgentMarkdownCell>() { return Err(Error::NotSingleAssistantMessage); }
+        let start = selection.start.offset.min(selection.end.offset);
+        let end = selection.start.offset.max(selection.end.offset);
+        let layout = self.layout(&cells, index).ok_or(Error::SourceUnavailable)?;
+        let mut quotation = layout.text().get(start..end).ok_or(Error::SourceUnavailable)?.to_owned();
+        quotation.retain(|ch| !ch.is_control() || matches!(ch, '\n' | '\t'));
+        // Pi bounds selected passages at 50,000 UTF-16 code units, including non-BMP text.
+        if quotation.trim().is_empty() { return Err(Error::NoSelection); }
+        if quotation.encode_utf16().count() > 50_000 { return Err(Error::TooLarge); }
+        let display_row = layout.row_for_offset(start);
+        Ok(DocumentSelection { display_range: start..end, display_row, quotation })
     }
 
     /// A PRIMARY write is silent: it neither claims CLIPBOARD was copied nor ends selection.

@@ -124,7 +124,7 @@ impl TranscriptView {
     }
 
     /// Search offsets belong to the held revision and must be refreshed when it is released.
-    pub(super) fn release_live_reading(&mut self) {
+    pub(crate) fn release_live_reading(&mut self) {
         if self.held_reading.take().is_some() {
             self.invalidate_held_search();
         }

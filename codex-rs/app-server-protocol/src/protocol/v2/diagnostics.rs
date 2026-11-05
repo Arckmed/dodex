@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Increment when a Dodex client requires a different extension protocol.
-pub const DODEX_PROTOCOL_VERSION: u32 = 1;
+pub const DODEX_PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]

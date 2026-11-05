@@ -335,6 +335,16 @@ impl LiveThread {
     }
 
     /// Read the latest persisted Commentary checkpoint after flushing preceding appends.
+    pub async fn load_outline_revision(&self, id: String, revision: String) -> ThreadStoreResult<Option<String>> {
+        self.flush().await?;
+        self.thread_store.load_outline_revision(LoadThreadHistoryParams { thread_id: self.thread_id, include_archived: false }, id, revision).await
+    }
+
+    pub async fn load_outline_state(&self) -> ThreadStoreResult<Option<serde_json::Value>> {
+        self.flush().await?;
+        self.thread_store.load_outline_state(LoadThreadHistoryParams { thread_id: self.thread_id, include_archived: false }).await
+    }
+
     pub async fn load_commentary_state(&self) -> ThreadStoreResult<Option<serde_json::Value>> {
         self.flush().await?;
         self.thread_store.load_commentary_state(LoadThreadHistoryParams { thread_id: self.thread_id, include_archived: false }).await

@@ -1610,6 +1610,8 @@ pub enum EventMsg {
 
     /// Local Commentary outbox checkpoint; not a message to the model.
     DodexCommentaryState(DodexCommentaryStateEvent),
+    /// Model-invisible canonical Outline checkpoint, inherited through bounded fork history.
+    DodexOutlineState(DodexCommentaryStateEvent),
 
     /// A durable thread-scoped user-message queue changed.
     ThreadQueueChanged(ThreadQueueChangedEvent),

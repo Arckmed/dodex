@@ -969,6 +969,7 @@ See the Codex keymap documentation for supported actions and examples."
             agents_overview::AgentsOverviewState::new(local_settings.tui.agents_overview_grouping);
         let mut app = Self {
             feature_write_lock: Arc::default(),
+            outline: Default::default(),
             commentary_sessions: Default::default(),
             commentary_active_thread: None,
             commentary_load_id: None,

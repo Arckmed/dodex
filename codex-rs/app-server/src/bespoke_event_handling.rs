@@ -1284,6 +1284,11 @@ pub(crate) async fn apply_bespoke_event_handling(
             )
             .await;
         }
+        EventMsg::DodexOutlineState(event) => {
+            outgoing.send_server_notification(ServerNotification::ThreadOutlineUpdated(codex_app_server_protocol::ThreadOutlineUpdatedNotification {
+                thread_id: conversation_id.to_string(), generation: event.state["generation"].as_u64().unwrap_or(0),
+            })).await;
+        }
         EventMsg::ThreadGoalUpdated(thread_goal_event) => {
             let notification = ThreadGoalUpdatedNotification {
                 thread_id: thread_goal_event.thread_id.to_string(),

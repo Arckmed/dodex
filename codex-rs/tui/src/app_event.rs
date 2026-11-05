@@ -297,6 +297,8 @@ pub(crate) struct AgentPickerThreadRefresh {
 #[derive(Debug, IntoStaticStr)]
 pub(crate) enum AppEvent {
     ToggleThoughts,
+    Outline { thread_id: ThreadId, action: crate::dodex_features::outline::OutlineAction },
+    OutlineCommand(String),
     OpenCommentarySelection,
     ResumeCommentaryDraft { thread_id: ThreadId },
     CommentaryCommand { argument: String },

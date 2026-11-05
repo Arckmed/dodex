@@ -2033,6 +2033,10 @@ impl BottomPane {
         self.composer.handle_mouse(event)
     }
 
+    pub(crate) fn update_outline(&mut self, source: &crate::dodex_features::commentary::Source, text: &str) {
+        for view in &mut self.view_stack { view.update_outline(source, text); }
+    }
+
     pub(crate) fn show_view(&mut self, view: Box<dyn BottomPaneView>) {
         self.push_view(view);
     }

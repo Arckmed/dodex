@@ -194,6 +194,12 @@ impl App {
                 self.chat_widget.toggle_thoughts();
                 tui.frame_requester().schedule_frame();
             }
+            AppEvent::OutlineCommand(command) => {
+                self.sync_outline_thread();
+                if let Some(thread_id) = self.current_displayed_thread_id() { self.outline_action(tui, app_server, thread_id, crate::dodex_features::outline::OutlineAction::Command(command)).await; }
+                else { self.chat_widget.add_error_message("Start a saved conversation before creating an Outline.".into()); }
+            }
+            AppEvent::Outline { thread_id, action } => self.outline_action(tui, app_server, thread_id, action).await,
             AppEvent::OpenCommentarySelection => self.open_commentary_selection(app_server).await,
             AppEvent::ResumeCommentaryDraft { thread_id } => self.edit_commentary_draft(app_server, thread_id).await,
             AppEvent::CommentaryCommand { argument } => self.handle_commentary_command(app_server, &argument).await,

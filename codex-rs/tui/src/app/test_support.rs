@@ -21,6 +21,7 @@ pub(crate) async fn make_test_app() -> Box<App> {
     let session_telemetry = test_session_telemetry(&config, model.as_str());
 
     Box::new(App {
+        outline: Default::default(),
         commentary_sessions: Default::default(),
         commentary_active_thread: None,
         commentary_load_id: None,

@@ -5602,6 +5602,23 @@
       ],
       "type": "object"
     },
+    "ThreadOutlineUpdatedNotification": {
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "generation",
+        "threadId"
+      ],
+      "type": "object"
+    },
     "ThreadPredictionResult": {
       "oneOf": [
         {
@@ -7488,6 +7505,26 @@
         "params"
       ],
       "title": "Thread/attachment/updatedNotification",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/dodex/outline/updated"
+          ],
+          "title": "Thread/dodex/outline/updatedNotificationMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ThreadOutlineUpdatedNotification"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "title": "Thread/dodex/outline/updatedNotification",
       "type": "object"
     },
     {

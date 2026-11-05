@@ -639,6 +639,11 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::ThreadGoalSetResponse,
     },
+    ThreadOutline => "thread/dodex/outline" {
+        params: v2::ThreadOutlineParams,
+        serialization: thread_id(params.thread_id),
+        response: v2::ThreadOutlineResponse,
+    },
     ThreadCommentaryGet => "thread/dodex/commentary/get" {
         params: v2::ThreadCommentaryGetParams,
         serialization: thread_id(params.thread_id),
@@ -2035,6 +2040,7 @@ server_notification_definitions! {
     ThreadNameUpdated => "thread/name/updated" (v2::ThreadNameUpdatedNotification),
     ThreadSectionChanged => "thread/section/changed" (v2::ThreadSectionChangedNotification),
     ThreadAttachmentUpdated => "thread/attachment/updated" (v2::ThreadAttachmentUpdatedNotification),
+    ThreadOutlineUpdated => "thread/dodex/outline/updated" (v2::ThreadOutlineUpdatedNotification),
     ThreadGoalUpdated => "thread/goal/updated" (v2::ThreadGoalUpdatedNotification),
     #[experimental("thread/prediction/updated")]
     ThreadPredictionUpdated => "thread/prediction/updated" (v2::ThreadPredictionUpdatedNotification),

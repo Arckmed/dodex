@@ -8,6 +8,13 @@ use crate::error_code::{internal_error, invalid_request};
 use super::ThreadRequestProcessor;
 
 impl ThreadRequestProcessor {
+    pub(crate) async fn thread_outline(&self, params: codex_app_server_protocol::ThreadOutlineParams) -> Result<codex_app_server_protocol::ThreadOutlineResponse, JSONRPCErrorError> {
+        let id = ThreadId::from_string(&params.thread_id).map_err(|e| invalid_request(format!("invalid thread id: {e}")))?;
+        let thread = self.thread_manager.get_thread(id).await.map_err(|e| invalid_request(format!("thread is not loaded: {e}")))?;
+        let result = thread.outline_request(params.request).await.map_err(invalid_request)?;
+        Ok(codex_app_server_protocol::ThreadOutlineResponse { result })
+    }
+
     pub(crate) async fn thread_commentary_get(&self, params: ThreadCommentaryGetParams) -> Result<ThreadCommentaryGetResponse, JSONRPCErrorError> {
         let id = ThreadId::from_string(&params.thread_id).map_err(|error| invalid_request(format!("invalid thread id: {error}")))?;
         let thread = self.thread_manager.get_thread(id).await.map_err(|error| invalid_request(format!("thread is not loaded: {error}")))?;
