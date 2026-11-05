@@ -543,6 +543,7 @@ impl App {
         self.pending_server_profiles.remove(&thread_id);
         self.agents_overview.activity.remove(&thread_id);
         self.side_threads.remove(&thread_id);
+        self.commentary_sessions.remove(&thread_id);
         self.agent_navigation.remove(thread_id);
         if self.active_thread_id == Some(thread_id) {
             self.clear_active_thread().await;

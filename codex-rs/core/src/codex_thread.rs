@@ -202,6 +202,7 @@ pub struct CodexThread {
     startup_metadata: ThreadStartupMetadata,
     rollout_path: Option<PathBuf>,
     out_of_band_elicitations: Mutex<OutOfBandElicitations>,
+    temporary_commentary: Mutex<Option<serde_json::Value>>,
     _diagnostics_guard: GaugeGuard,
 }
 
@@ -237,6 +238,7 @@ impl CodexThread {
             startup_metadata,
             rollout_path,
             out_of_band_elicitations: Mutex::new(OutOfBandElicitations::default()),
+            temporary_commentary: Mutex::new(None),
             _diagnostics_guard: LIVE_THREADS.track(),
         }
     }
@@ -1041,8 +1043,22 @@ impl CodexThread {
     }
 
     pub async fn load_commentary_state(&self) -> ThreadStoreResult<Option<serde_json::Value>> {
-        let live_thread = self.session.live_thread_for_persistence("load Commentary state").map_err(|err| ThreadStoreError::Internal { message: err.to_string() })?;
-        live_thread.load_commentary_state().await
+        match self.session.live_thread() {
+            Some(live_thread) => live_thread.load_commentary_state().await,
+            None => Ok(self.temporary_commentary.lock().await.clone()),
+        }
+    }
+
+    /// Temporary conversations retain checkpoints only for the lifetime of their loaded thread.
+    pub async fn save_commentary_state(&self, state: serde_json::Value) -> ThreadStoreResult<()> {
+        if self.session.live_thread().is_none() {
+            *self.temporary_commentary.lock().await = Some(state);
+            return Ok(());
+        }
+        self.append_rollout_items(&[RolloutItem::EventMsg(codex_protocol::protocol::EventMsg::DodexCommentaryState(
+            codex_protocol::protocol::DodexCommentaryStateEvent { state },
+        ))]).await?;
+        self.flush_rollout().await.map_err(|error| ThreadStoreError::Internal { message: error.to_string() })
     }
 
     pub async fn read_thread(

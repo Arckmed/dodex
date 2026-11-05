@@ -85,6 +85,8 @@ All features are currently being tested.
 
 ## Commentary
 
+In temporary `/btw` conversations, comments and unfinished drafts stay in memory while switching views. Closing the temporary conversation discards them; they are not written to saved session history.
+
 Select passages from the clanker's messages and leave comments on them. Useful for answering questions, asking follow-ups, or giving feedback on several parts of a response. Once you're done, review your comments and send them together as a single message.
 
 ## Outline

@@ -214,6 +214,8 @@ impl SlashCommand {
         matches!(
             self,
             SlashCommand::Copy
+                | SlashCommand::Commentary
+                | SlashCommand::Comments
                 | SlashCommand::Agents
                 | SlashCommand::Export
                 | SlashCommand::Raw
@@ -367,6 +369,13 @@ mod tests {
     fn pet_alias_parses_to_pets_command() {
         assert_eq!(SlashCommand::Pets.command(), "pets");
         assert_eq!(SlashCommand::from_str("pet"), Ok(SlashCommand::Pets));
+    }
+
+    #[test]
+    fn commentary_commands_are_available_in_side_conversations() {
+        assert!(SlashCommand::Commentary.available_in_side_conversation());
+        assert!(SlashCommand::Comments.available_in_side_conversation());
+        assert!(!SlashCommand::Outline.available_in_side_conversation());
     }
 
     #[test]

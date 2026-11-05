@@ -599,6 +599,10 @@ impl AgentMarkdownCell {
         self.source_item_id.as_deref()
     }
 
+    pub(crate) fn commentary_source_text(&self) -> &str {
+        self.copy_source.as_deref().unwrap_or(&self.markdown_source)
+    }
+
     pub(crate) fn with_copy_source(mut self, source: Option<String>) -> Self {
         self.copy_source = source;
         self

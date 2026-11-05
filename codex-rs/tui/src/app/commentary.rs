@@ -17,9 +17,37 @@ pub(super) struct CommentarySession {
     review_submission: Option<String>,
     dirty: bool,
     return_to_outbox: bool,
+    received_submission: Option<String>,
 }
 
 impl App {
+    fn temporary_commentary_thread(&self, thread_id: ThreadId) -> bool {
+        self.config.ephemeral || self.side_threads.contains_key(&thread_id)
+    }
+
+    async fn commentary_sources(&mut self, server: &mut AppServerSession, thread_id: ThreadId) -> color_eyre::Result<Vec<(String, codex_app_server_protocol::ThreadItem)>> {
+        if !self.temporary_commentary_thread(thread_id) { return server.thread_commentary_sources(thread_id).await; }
+        Ok(crate::dodex_features::commentary_source::transcript_sources(&self.transcript_cells))
+    }
+
+    async fn commentary_source(&mut self, server: &mut AppServerSession, thread_id: ThreadId, turn_id: &str, item_id: &str) -> color_eyre::Result<Option<codex_app_server_protocol::ThreadItem>> {
+        if !self.temporary_commentary_thread(thread_id) { return server.thread_commentary_source(thread_id, turn_id, item_id).await; }
+        Ok(self.commentary_sources(server, thread_id).await?.into_iter()
+            .find(|(turn, item)| turn == turn_id && item.id() == item_id).map(|(_, item)| item))
+    }
+
+    pub(super) fn observe_commentary_receipt(&mut self, notification: &ServerNotification) {
+        let ServerNotification::ItemCompleted(event) = notification else { return; };
+        let Ok(thread_id) = ThreadId::from_string(&event.thread_id) else { return; };
+        if !self.temporary_commentary_thread(thread_id) { return; }
+        let Some(session) = self.commentary_sessions.get_mut(&thread_id) else { return; };
+        let Some(submission) = session.state.submission.as_ref() else { return; };
+        if crate::dodex_features::commentary_source::matches_submission(&event.item.payload, &submission.text) {
+            session.received_submission = Some(submission.text.clone());
+            self.app_event_tx.send(AppEvent::CheckCommentaryReceipt { thread_id, attempt: 0 });
+        }
+    }
+
     pub(super) async fn flush_current_commentary_checkpoint(&mut self, server: &mut AppServerSession) -> bool {
         let Some(thread_id) = self.current_displayed_thread_id() else { return true; };
         let Some(session) = self.commentary_sessions.get(&thread_id) else { return true; };
@@ -84,7 +112,7 @@ impl App {
     async fn browse_commentary_sources(&mut self, server: &mut AppServerSession) {
         let Some(thread_id) = self.current_displayed_thread_id() else { return; };
         if !self.load_commentary_session(server, thread_id).await { return; }
-        let sources = match server.thread_commentary_sources(thread_id).await {
+        let sources = match self.commentary_sources(server, thread_id).await {
             Ok(sources) => sources,
             Err(error) => { self.chat_widget.add_error_message(format!("Could not browse assistant sources: {error}")); return; }
         };
@@ -120,7 +148,7 @@ impl App {
         if self.reconnect.offline { return; }
         let Some(thread_id) = current else { return; };
         // Clean cached state can be reloaded after a switch; retain failed writes in memory.
-        if self.commentary_sessions.get(&thread_id).is_some_and(|session| !session.dirty) { self.commentary_sessions.remove(&thread_id); }
+        if !self.temporary_commentary_thread(thread_id) && self.commentary_sessions.get(&thread_id).is_some_and(|session| !session.dirty) { self.commentary_sessions.remove(&thread_id); }
         if self.commentary_sessions.contains_key(&thread_id) { return; }
         let handle = server.request_handle(); let tx = self.app_event_tx.clone();
         let load_id = Uuid::new_v4(); self.commentary_load_id = Some(load_id);
@@ -141,7 +169,7 @@ impl App {
             Ok(Some(value)) => match Commentary::from_saved(&value) { Some(state) => state, None => { self.chat_widget.add_error_message("Saved Commentary is damaged or unsupported and has been retained unchanged.".into()); return; } },
             Err(error) => { self.chat_widget.add_error_message(format!("Could not restore Commentary: {error}")); return; }
         };
-        self.commentary_sessions.insert(thread_id, CommentarySession { state, revision: Uuid::new_v4(), editor_id: None, review_id: None, review_submission: None, dirty: false, return_to_outbox: false });
+        self.commentary_sessions.insert(thread_id, CommentarySession { state, revision: Uuid::new_v4(), editor_id: None, review_id: None, review_submission: None, dirty: false, return_to_outbox: false, received_submission: None });
         self.reconcile_commentary_receipt(server, thread_id).await;
     }
 
@@ -221,10 +249,14 @@ impl App {
 
     async fn reconcile_commentary_receipt(&mut self, server: &mut AppServerSession, thread_id: ThreadId) -> bool {
         let Some(text) = self.commentary_sessions.get(&thread_id).and_then(|session| session.state.submission.as_ref()).map(|submission| submission.text.clone()) else { return true; };
-        match server.thread_commentary_received(thread_id, &text).await {
+        let received = if self.temporary_commentary_thread(thread_id) {
+            Ok(self.commentary_sessions.get(&thread_id).is_some_and(|session| session.received_submission.as_deref() == Some(text.as_str())))
+        } else { server.thread_commentary_received(thread_id, &text).await };
+        match received {
             Ok(false) => true,
             Ok(true) => {
                 let session = self.commentary_sessions.get_mut(&thread_id).expect("session loaded");
+                session.received_submission = None;
                 session.state.acknowledge(&text); session.dirty = true; session.revision = Uuid::new_v4();
                 let revision = session.revision;
                 self.save_commentary_checkpoint(server, thread_id, revision).await; true
@@ -328,7 +360,7 @@ impl App {
             return;
         }
         let Some(turn_id) = source.turn_id.as_deref() else { self.chat_widget.add_error_message("This source does not identify an assistant turn.".into()); return; };
-        let item = match server.thread_commentary_source(thread_id, turn_id, &source.entry_id).await {
+        let item = match self.commentary_source(server, thread_id, turn_id, &source.entry_id).await {
             Ok(Some(item)) => item,
             Ok(None) => { self.chat_widget.add_error_message("The saved assistant source is unavailable.".into()); return; }
             Err(error) => { self.chat_widget.add_error_message(format!("Could not read the saved source: {error}")); return; }
@@ -395,7 +427,7 @@ impl App {
                 },
                 Err(error) => { self.chat_widget.add_error_message(format!("Could not load Commentary: {error}")); return false; }
             };
-            self.commentary_sessions.insert(thread_id, CommentarySession { state, revision: Uuid::new_v4(), editor_id: None, review_id: None, review_submission: None, dirty: false, return_to_outbox: false });
+            self.commentary_sessions.insert(thread_id, CommentarySession { state, revision: Uuid::new_v4(), editor_id: None, review_id: None, review_submission: None, dirty: false, return_to_outbox: false, received_submission: None });
         }
         true
     }
@@ -412,7 +444,7 @@ impl App {
                 Ok(selection) => selection,
                 Err(error) => { self.chat_widget.add_error_message(format!("Select a passage in one completed assistant response before pressing Alt+C ({error:?}).")); return; }
             };
-            let item = match server.thread_commentary_source(thread_id, &selection.source_turn_id, &selection.source_item_id).await {
+            let item = match self.commentary_source(server, thread_id, &selection.source_turn_id, &selection.source_item_id).await {
                 Ok(Some(item)) => item,
                 Ok(None) => { self.chat_widget.add_error_message("The selected assistant response could not be found in saved history.".into()); return; }
                 Err(error) => { self.chat_widget.add_error_message(format!("Could not read the Commentary source: {error}")); return; }

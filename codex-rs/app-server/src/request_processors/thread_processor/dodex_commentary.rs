@@ -2,8 +2,6 @@
 
 use codex_app_server_protocol::{JSONRPCErrorError, ThreadCommentaryGetParams, ThreadCommentaryGetResponse, ThreadCommentarySetParams, ThreadCommentarySetResponse};
 use codex_protocol::ThreadId;
-use codex_protocol::protocol::{DodexCommentaryStateEvent, EventMsg};
-use codex_rollout::RolloutItem;
 use crate::error_code::{internal_error, invalid_request};
 use super::ThreadRequestProcessor;
 
@@ -29,9 +27,8 @@ impl ThreadRequestProcessor {
         if !valid { return Err(invalid_request("invalid Commentary state")); }
         let id = ThreadId::from_string(&params.thread_id).map_err(|error| invalid_request(format!("invalid thread id: {error}")))?;
         let thread = self.thread_manager.get_thread(id).await.map_err(|error| invalid_request(format!("thread is not loaded: {error}")))?;
-        thread.append_rollout_items(&[RolloutItem::EventMsg(EventMsg::DodexCommentaryState(DodexCommentaryStateEvent { state: params.state }))]).await
-            .map_err(|error| internal_error(format!("failed to append Commentary state: {error}")))?;
-        thread.flush_rollout().await.map_err(|error| internal_error(format!("failed to persist Commentary state: {error}")))?;
+        thread.save_commentary_state(params.state).await
+            .map_err(|error| internal_error(format!("failed to save Commentary state: {error}")))?;
         Ok(ThreadCommentarySetResponse {})
     }
 }

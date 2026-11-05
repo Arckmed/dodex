@@ -168,6 +168,7 @@ impl App {
         app_server_client: &AppServerSession,
         mut notification: ServerNotification,
     ) {
+        self.observe_commentary_receipt(&notification);
         if let ServerNotification::ThreadOutlineUpdated(update) = &notification {
             if let Ok(thread_id) = ThreadId::from_string(&update.thread_id) { self.refresh_outline(app_server_client, thread_id); }
             return;
