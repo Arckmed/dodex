@@ -242,7 +242,8 @@ impl MathParser<'_> {
         let name = &self.remaining[..length];
         self.remaining = &self.remaining[length..];
         match name {
-            "sum" | "bigwedge" | "int"
+            "sum" | "bigwedge" | "bigvee" | "bigcup" | "bigcap" | "bigsqcup" | "bigsqcap"
+            | "biguplus" | "int"
                 if self.stack_annotations && (name != "int" || self.mode == MathMode::Display) =>
             {
                 self.display_operator(symbol(name)?)
@@ -359,7 +360,8 @@ impl MathParser<'_> {
                 }
             }
             "quad" | "qquad" => Some(Layout::text(" ")),
-            "sin" | "cos" | "tan" | "log" | "ln" | "exp" | "lim" | "max" | "min" => {
+            "sin" | "cos" | "tan" | "log" | "ln" | "exp" | "lim" | "max" | "min" | "sup"
+            | "inf" => {
                 Some(Layout::text(name))
             }
             _ => symbol(name).map(Layout::text),
@@ -425,6 +427,9 @@ fn symbol(name: &str) -> Option<&'static str> {
         "Re" => "ℜ",
         "Im" => "ℑ",
         "aleph" => "ℵ",
+        "wp" => "℘",
+        "sharp" => "♯",
+        "flat" => "♭",
         "imath" => "ı",
         "jmath" => "ȷ",
         "prime" => "′",
@@ -456,6 +461,13 @@ fn symbol(name: &str) -> Option<&'static str> {
         "perp" => "⊥",
         "parallel" => "∥",
         "equiv" => "≡",
+        "prec" => "≺",
+        "succ" => "≻",
+        "preceq" => "≼",
+        "succeq" => "≽",
+        "triangleq" => "≜",
+        "coloneqq" => "≔",
+        "eqqcolon" => "≕",
         "in" => "∈",
         "notin" => "∉", // codespell:ignore notin
         "ni" => "∋",
@@ -463,11 +475,28 @@ fn symbol(name: &str) -> Option<&'static str> {
         "subseteq" => "⊆",
         "supset" => "⊃",
         "supseteq" => "⊇",
+        "subsetneq" => "⊊",
+        "supsetneq" => "⊋",
+        "nsubseteq" => "⊈",
+        "nsupseteq" => "⊉",
+        "sqsubset" => "⊏",
+        "sqsubseteq" => "⊑",
+        "sqsupset" => "⊐",
+        "sqsupseteq" => "⊒",
+        "nsqsubseteq" => "⋢",
+        "nsqsupseteq" => "⋣",
+        "sqcup" => "⊔",
+        "sqcap" => "⊓",
+        "bigsqcup" => "⨆",
+        "bigsqcap" => "⨅",
         "cup" => "∪",
         "cap" => "∩",
+        "uplus" => "⊎",
+        "biguplus" => "⨄",
         "bigcup" => "⋃",
         "bigcap" => "⋂",
         "bigwedge" => "⋀",
+        "bigvee" => "⋁",
         "setminus" => "∖",
         "emptyset" | "varnothing" => "∅",
         "land" | "wedge" => "∧",
@@ -475,6 +504,14 @@ fn symbol(name: &str) -> Option<&'static str> {
         "neg" | "lnot" => "¬",
         "top" => "⊤",
         "bot" => "⊥",
+        "triangle" => "△",
+        "triangledown" => "▽",
+        "vdash" => "⊢",
+        "dashv" => "⊣",
+        "models" | "vDash" => "⊨",
+        "Vdash" => "⊩",
+        "nvdash" => "⊬",
+        "nvDash" => "⊭",
         "forall" => "∀",
         "exists" => "∃",
         "nexists" => "∄",
@@ -482,6 +519,22 @@ fn symbol(name: &str) -> Option<&'static str> {
         "leftarrow" => "←",
         "leftrightarrow" => "↔",
         "mapsto" => "↦",
+        "hookrightarrow" => "↪",
+        "hookleftarrow" => "↩",
+        "twoheadrightarrow" => "↠",
+        "twoheadleftarrow" => "↞",
+        "leadsto" | "rightsquigarrow" => "⇝",
+        "rightharpoonup" => "⇀",
+        "leftharpoondown" => "↽",
+        "rightleftharpoons" => "⇌",
+        "leftrightharpoons" => "⇋",
+        "longrightarrow" => "⟶",
+        "longleftarrow" => "⟵",
+        "longleftrightarrow" => "⟷",
+        "longmapsto" => "⟼",
+        "Longrightarrow" => "⟹",
+        "Longleftarrow" => "⟸",
+        "Longleftrightarrow" => "⟺",
         "uparrow" => "↑",
         "downarrow" => "↓",
         "updownarrow" => "↕",
@@ -504,6 +557,8 @@ fn delimiter(name: &str) -> Option<&'static str> {
         "rbrace" | "}" => "}",
         "lbrack" => "[",
         "rbrack" => "]",
+        "llbracket" => "⟦",
+        "rrbracket" => "⟧",
         "vert" | "lvert" | "rvert" => "|",
         "Vert" | "lVert" | "rVert" | "|" => "‖",
         "lfloor" => "⌊",

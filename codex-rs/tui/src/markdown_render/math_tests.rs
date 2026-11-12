@@ -54,6 +54,76 @@ Punctuation: $x\prime$, $a\circ b\bullet c$, $\vdots\ddots$.",
 }
 
 #[test]
+fn unicode_math_program_analysis_formulas() {
+    for (source, expected) in [
+        (
+            r"$\bot \sqsubset a \sqsubseteq a \sqcup b \sqsupseteq a \sqcap b \sqsupset \bot$",
+            "⊥ ⊏ a ⊑ a ⊔ b ⊒ a ⊓ b ⊐ ⊥",
+        ),
+        (
+            r"$\alpha(c) \sqsubseteq a \iff c \subseteq \gamma(a)$",
+            "α(c) ⊑ a ⇔ c ⊆ γ(a)",
+        ),
+        (
+            r"$\llbracket x := e \rrbracket(\sigma) = \sigma[x \mapsto \llbracket e \rrbracket(\sigma)]$",
+            "⟦ x := e ⟧(σ) = σ[x ↦ ⟦ e ⟧(σ)]",
+        ),
+        (
+            r"$\Gamma \vdash e : \tau \implies \sigma \models P$; $\Gamma \nvdash e : \tau$, $\sigma \nvDash Q$",
+            "Γ ⊢ e : τ ⇒ σ ⊨ P; Γ ⊬ e : τ, σ ⊭ Q",
+        ),
+        (
+            r"$x \nabla y$, $x \triangle y$, $\mu F$, $\nu F$, $\sup S$, $\inf S$",
+            "x ∇ y, x △ y, μ F, ν F, sup S, inf S",
+        ),
+        (
+            r"$f : A \rightharpoonup B$, $\alpha \dashv \gamma$, $s \leadsto t$, $A \uplus B$",
+            "f : A ⇀ B, α ⊣ γ, s ⇝ t, A ⊎ B",
+        ),
+        (
+            r"$\left\llbracket e \right\rrbracket$; `$\sqsubseteq$`",
+            "⟦ e ⟧; $\\sqsubseteq$",
+        ),
+    ] {
+        assert_eq!(plain(source, /*width*/ 160), expected, "{source}");
+    }
+}
+
+#[test]
+fn unicode_math_lattice_operators_preserve_limits() {
+    for (source, operator) in [
+        (r"\bigsqcup", "⨆"),
+        (r"\bigsqcap", "⨅"),
+        (r"\bigcup", "⋃"),
+        (r"\bigcap", "⋂"),
+        (r"\bigvee", "⋁"),
+        (r"\biguplus", "⨄"),
+    ] {
+        let formula = format!("{source}_{{i=0}}^n x_i");
+        assert_eq!(
+            render(&formula, MathMode::Display)
+                .unwrap()
+                .text
+                .lines()
+                .map(str::trim_end)
+                .join("\n"),
+            format!(" n\n {operator}  xᵢ\ni=0"),
+        );
+        let inline = render(&formula, MathMode::Inline).unwrap();
+        assert!(!inline.text.contains('\n'));
+        assert!(inline.text.contains(operator));
+        assert!(inline.text.ends_with(" xᵢ"));
+        let display = format!(r"\[{formula}\]");
+        assert!(plain(&display, /*width*/ 80).contains(operator));
+        // A layout that does not fit stays readable as source rather than losing its bounds.
+        assert_eq!(
+            plain(&display, /*width*/ 2),
+            plain(&format!("`{display}`"), /*width*/ 2),
+        );
+    }
+}
+
+#[test]
 fn unicode_math_named_delimiters_snapshot() {
     insta::assert_snapshot!(plain(
         r"Inner product: $\left\langle\hat H\right\rangle$.

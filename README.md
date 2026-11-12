@@ -117,6 +117,14 @@ Commentary works in the pinned and expanded views. With Commentary enabled, drag
 
 Deactivation and deletion affect future requests. They do not erase earlier discussion, tool results, or a request already in flight. Outline requires a backend containing this feature; when upgrading an existing Dodex daemon, use the complete new package's `app-server daemon update --from-cli` command.
 
+## Program-analysis math
+
+LaTeX math in assistant messages supports lattice relations (`\sqsubset`, `\sqsubseteq`, `\sqsupset`, `\sqsupseteq`), joins and meets (`\sqcup`, `\sqcap`, `\bigsqcup`, `\bigsqcap`), and bounds above and below the large operators in display math. Inline formulas retain compact bounds.
+
+Related notation includes semantic brackets (`\llbracket`, `\rrbracket`), proof and satisfaction relations (`\vdash`, `\dashv`, `\models` and negated forms), strict and negated set/order relations, partial-function and transition arrows, disjoint unions, `\sup`, and `\inf`. Existing Greek letters, `\top`, `\bot`, and `\nabla` combine with these symbols for abstract interpretation and fixed-point formulas. `\triangle` and `\triangledown` are also supported.
+
+For example, `$\alpha(c) \sqsubseteq a \iff c \subseteq \gamma(a)$` renders as `α(c) ⊑ a ⇔ c ⊆ γ(a)`. Code spans keep the original LaTeX source, and display formulas that do not fit retain their source instead of dropping their bounds.
+
 ## Conversation timers and status line
 
 The default status line follows the configured Dodex layout, with `Current HH:MM:SS` and `Total HH:MM:SS` immediately after the thread name. Current measures this opening of the conversation; total accumulates open time across visits, starting when tracking is installed. Closed time is excluded. Customize the items with `/statusline` (`session-current` and `session-total`).
