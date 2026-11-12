@@ -139,12 +139,6 @@ impl ChatWidget {
         cmd: SlashCommand,
         source: SlashCommandDispatchSource,
     ) -> bool {
-        if source == SlashCommandDispatchSource::Live && cmd.requires_dispatch_validation() {
-            return self.is_user_turn_pending_or_running()
-                || (cmd == SlashCommand::Review
-                    && self.input_queue.has_queued_follow_up_messages());
-        }
-
         (!cmd.available_during_task()
             && (self.turn_lifecycle.agent_turn_running
                 || self.review.is_review_mode
@@ -155,6 +149,10 @@ impl ChatWidget {
                 && (self.input_queue.user_turn_pending_start
                     || self.turn_lifecycle.agent_turn_running))
             || (cmd == SlashCommand::Export && self.input_queue.suppress_queue_autosend)
+            || (cmd == SlashCommand::Review
+                && source == SlashCommandDispatchSource::Live
+                && (self.is_user_turn_pending_or_running()
+                    || self.input_queue.has_queued_follow_up_messages()))
     }
 
     pub(super) fn dispatch_command(&mut self, cmd: SlashCommand) {
@@ -187,12 +185,6 @@ impl ChatWidget {
             }
             self.request_redraw();
             return;
-        }
-
-        if source == SlashCommandDispatchSource::Live && cmd.requires_dispatch_validation() {
-            self.bottom_pane
-                .set_composer_text(String::new(), Vec::new(), Vec::new());
-            self.bottom_pane.drain_pending_submission_state();
         }
 
         match cmd {
@@ -362,6 +354,11 @@ impl ChatWidget {
                     .send(AppEvent::GenerateRecap { thread_id });
             }
             SlashCommand::Review => {
+                if source == SlashCommandDispatchSource::Live {
+                    self.bottom_pane
+                        .set_composer_text(String::new(), Vec::new(), Vec::new());
+                    self.bottom_pane.drain_pending_submission_state();
+                }
                 self.open_review_popup();
                 if self.mcp_startup_status.is_some() {
                     self.defer_input_until_settings_applied();
@@ -1407,9 +1404,7 @@ impl ChatWidget {
             "'/{}' is unavailable in side conversations. {SIDE_SLASH_COMMAND_UNAVAILABLE_HINT}",
             cmd.command()
         ));
-        if !cmd.requires_dispatch_validation() {
-            self.bottom_pane.drain_pending_submission_state();
-        }
+        self.bottom_pane.drain_pending_submission_state();
         false
     }
 

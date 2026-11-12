@@ -1,8 +1,8 @@
 # Dodex
 
-Current source version: **0.166.0-dodex.1**.
+Current source version: **0.167.2-dodex.1**.
 
-Upstream base: OpenAI's development `main` at [`a09812981d`](https://github.com/openai/codex/commit/a09812981de703f18f38015cd5d500ab373f616c) (November 1, 2026). This is not the `rust-v0.166.0` stable release tag.
+Upstream base: OpenAI Codex CLI stable [`rust-v0.167.2`](https://github.com/openai/codex/releases/tag/rust-v0.167.2) (November 11, 2026), with Dodex customizations applied on top.
 
 A Codex fork with a few personal extensions to the terminal interface, implemented directly in the source code.
 
